@@ -1,0 +1,113 @@
+{
+  "method": "Exact existing source PNG copied from the user's 2K16 app; only neutral fill pixels are recolored at runtime",
+  "source_template": "C:/Users/James/Downloads/Projects/2k16 myteam/_Project/NBA 2k16 MyTEAM Viewer Public/source/viewer/assets/hot-zone-template.png",
+  "template_sha256": "b44b477aa6c6fa2ed220ef98fbab01133b2a05b581f6fccf0c8e0c4cedf03c63",
+  "reference_renderer": "C:/Users/James/Downloads/Projects/2k16 myteam/_Project/NBA 2k16 MyTEAM Viewer Public/source/viewer/app.js",
+  "reference_renderer_symbols": [
+    "hotZoneColors",
+    "hotZoneSeedPoints",
+    "bucketFillHotZone",
+    "paintHotZoneChart"
+  ],
+  "nba2k17_source_snapshot_id": 11298,
+  "nba2k17_source_url": "http://2kmtcentral.com/17/players/20618/lebron-james",
+  "nba2k17_source_raw_path": "../../../data/nba2k17/raw/wayback-replay/53/5360f9e52279eb16a891219c6f8229be1c357c0e521f1f051e653b53d39aa20c.html",
+  "nba2k17_source_sha256": "5360f9e52279eb16a891219c6f8229be1c357c0e521f1f051e653b53d39aa20c",
+  "source_state_mapping": {
+    "0": "blue/cold",
+    "1": "unfilled/neutral",
+    "2": "red/hot"
+  },
+  "reference_palette_rgb": {
+    "0": [
+      14,
+      88,
+      157
+    ],
+    "1": [
+      100,
+      100,
+      99
+    ],
+    "2": [
+      182,
+      19,
+      19
+    ]
+  },
+  "source_sections_in_array_order": [
+    [
+      0,
+      360,
+      0
+    ],
+    [
+      -180,
+      -45,
+      1
+    ],
+    [
+      -45,
+      45,
+      1
+    ],
+    [
+      45,
+      180,
+      1
+    ],
+    [
+      -180,
+      -72,
+      2
+    ],
+    [
+      -72,
+      -24,
+      2
+    ],
+    [
+      -24,
+      24,
+      2
+    ],
+    [
+      24,
+      72,
+      2
+    ],
+    [
+      72,
+      180,
+      2
+    ],
+    [
+      -180,
+      -72,
+      3
+    ],
+    [
+      -72,
+      -24,
+      3
+    ],
+    [
+      -24,
+      24,
+      3
+    ],
+    [
+      24,
+      72,
+      3
+    ],
+    [
+      72,
+      180,
+      3
+    ]
+  ],
+  "spatial_mapping": "Array order: under basket; close left/center/right; mid left/left-center/center/right-center/right; three left/left-center/center/right-center/right. Template left-named zones are below the basket-center line, matching the 2K16 named seeds.",
+  "missing_policy": "Missing, conflicting, unsupported or incomplete data is not painted as neutral. Source states are not inferred from shooting attributes.",
+  "scope": "Viewer rendering only. This does not verify native NBA 2K17 memory offsets or injection enums."
+}

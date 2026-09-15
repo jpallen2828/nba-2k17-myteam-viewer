@@ -1,0 +1,1028 @@
+{
+  "format": "nba2k17-native-gear-layout/v1",
+  "executable_sha256": "86c9d5396761e64567f8ec6233bd1ccb58f483d81455d055bb5c6c9444076a35",
+  "editor_record_rva": "0x9569d18",
+  "fields": [
+    {
+      "field": "gear.shoe_home",
+      "offset": 292,
+      "size": 4,
+      "shift": 0,
+      "bits": 14,
+      "signed": false,
+      "getter_rva": "0x180a9f",
+      "setter_rva": "0x183ca6",
+      "evidence_kind": "NATIVE_SERIALIZER_AND_CONTROLLED_UI_ENDPOINTS"
+    },
+    {
+      "field": "gear.shoe_away",
+      "offset": 292,
+      "size": 4,
+      "shift": 14,
+      "bits": 14,
+      "signed": false,
+      "getter_rva": "0x180ab0",
+      "setter_rva": "0x183cc7",
+      "evidence_kind": "NATIVE_SERIALIZER_AND_CONTROLLED_UI_ENDPOINTS"
+    },
+    {
+      "field": "gear.sock_length_home",
+      "offset": 314,
+      "size": 1,
+      "shift": 2,
+      "bits": 3,
+      "signed": false,
+      "getter_rva": "0xd726a0",
+      "setter_rva": "0xd76af0",
+      "label_hash": "0x2b4f8cb1",
+      "registration_rva": "0xd16e28",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.sock_length_away",
+      "offset": 314,
+      "size": 1,
+      "shift": 5,
+      "bits": 3,
+      "signed": false,
+      "getter_rva": "0xd72690",
+      "setter_rva": "0xd76a40",
+      "label_hash": "0xf71f0ffd",
+      "registration_rva": "0xd16ec9",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.undershirt",
+      "offset": 316,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0xd72620",
+      "setter_rva": "0xd768b0",
+      "label_hash": "0xc7eb72c2",
+      "registration_rva": "0xd16f72",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.undershirt_home_color",
+      "offset": 316,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17d0a0",
+      "setter_rva": "0x57dbf0",
+      "label_hash": "0xa2d48fb5",
+      "registration_rva": "0xd16183",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.undershirt_away_color",
+      "offset": 317,
+      "size": 1,
+      "shift": 0,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17d090",
+      "setter_rva": "0x57dbd0",
+      "label_hash": "0x63964c16",
+      "registration_rva": "0xd16221",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.shorts",
+      "offset": 317,
+      "size": 1,
+      "shift": 2,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd72630",
+      "setter_rva": "0xd76940",
+      "label_hash": "0xb964edb1",
+      "registration_rva": "0xd17013",
+      "valid_option_ids": [
+        0,
+        1,
+        2
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_leg",
+      "offset": 326,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd72380",
+      "setter_rva": "0xd760e0",
+      "label_hash": "0xa5fdfd48",
+      "registration_rva": "0xd16a5a",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_knee",
+      "offset": 328,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd72370",
+      "setter_rva": "0xd76040",
+      "label_hash": "0xaf2bc51b",
+      "registration_rva": "0xd16afb",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_ankle",
+      "offset": 330,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd72330",
+      "setter_rva": "0xd75dc0",
+      "label_hash": "0x9a419311",
+      "registration_rva": "0xd16b9c",
+      "valid_option_ids": [
+        0,
+        1,
+        2
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_leg",
+      "offset": 327,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd725f0",
+      "setter_rva": "0xd76760",
+      "label_hash": "0x20435466",
+      "registration_rva": "0xd16c3d",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_knee",
+      "offset": 329,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd725e0",
+      "setter_rva": "0xd766c0",
+      "label_hash": "0x7378767d",
+      "registration_rva": "0xd16ce6",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_ankle",
+      "offset": 331,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd725a0",
+      "setter_rva": "0xd76440",
+      "label_hash": "0x3e4c04cf",
+      "registration_rva": "0xd16d87",
+      "valid_option_ids": [
+        0,
+        1,
+        2
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.shorts_home_color",
+      "offset": 317,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17d0c0",
+      "setter_rva": "0x57dc80",
+      "label_hash": "0xf582241f",
+      "registration_rva": "0xd162c6",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_leg_home_color",
+      "offset": 326,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd60",
+      "setter_rva": "0x57b220",
+      "label_hash": "0xead8ff0c",
+      "registration_rva": "0xd15a1b",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_knee_home_color",
+      "offset": 328,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd40",
+      "setter_rva": "0x57b030",
+      "label_hash": "0x6e82e723",
+      "registration_rva": "0xd15b57",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_ankle_home_color",
+      "offset": 330,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17ccc0",
+      "setter_rva": "0x57abe0",
+      "label_hash": "0x72ee6641",
+      "registration_rva": "0xd15c93",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_leg_home_color",
+      "offset": 327,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf70",
+      "setter_rva": "0x57d890",
+      "label_hash": "0x332ec342",
+      "registration_rva": "0xd15dcf",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_knee_home_color",
+      "offset": 329,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf50",
+      "setter_rva": "0x57d6a0",
+      "label_hash": "0xff3f7d88",
+      "registration_rva": "0xd15f0b",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_ankle_home_color",
+      "offset": 331,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17ced0",
+      "setter_rva": "0x57d140",
+      "label_hash": "0x337ba1bb",
+      "registration_rva": "0xd16047",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.shorts_away_color",
+      "offset": 318,
+      "size": 1,
+      "shift": 0,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17d0b0",
+      "setter_rva": "0x57dc60",
+      "label_hash": "0x34c0e7bc",
+      "registration_rva": "0xd16364",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_leg_away_color",
+      "offset": 326,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd50",
+      "setter_rva": "0x57b200",
+      "label_hash": "0x2b9a3caf",
+      "registration_rva": "0xd15ab9",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_knee_away_color",
+      "offset": 328,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd30",
+      "setter_rva": "0x57b010",
+      "label_hash": "0xafc02480",
+      "registration_rva": "0xd15bf5",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_ankle_away_color",
+      "offset": 330,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17ccb0",
+      "setter_rva": "0x57abc0",
+      "label_hash": "0xb3aca5e2",
+      "registration_rva": "0xd15d31",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_leg_away_color",
+      "offset": 327,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf60",
+      "setter_rva": "0x57d870",
+      "label_hash": "0xf26c00e1",
+      "registration_rva": "0xd15e6d",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_knee_away_color",
+      "offset": 329,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf40",
+      "setter_rva": "0x57d680",
+      "label_hash": "0x3e7dbe2b",
+      "registration_rva": "0xd15fa9",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_ankle_away_color",
+      "offset": 331,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cec0",
+      "setter_rva": "0x57d120",
+      "label_hash": "0xf2396218",
+      "registration_rva": "0xd160e5",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_arm",
+      "offset": 318,
+      "size": 1,
+      "shift": 2,
+      "bits": 3,
+      "signed": false,
+      "getter_rva": "0xd72340",
+      "setter_rva": "0xd75e60",
+      "label_hash": "0x293d3972",
+      "registration_rva": "0xd1654b",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_elbow",
+      "offset": 320,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd72350",
+      "setter_rva": "0xd75f00",
+      "label_hash": "0x74d19c9e",
+      "registration_rva": "0xd165ec",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_wrist",
+      "offset": 322,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": false,
+      "getter_rva": "0xd72390",
+      "setter_rva": "0xd76180",
+      "label_hash": "0x4374331c",
+      "registration_rva": "0xd1668d",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_fingers",
+      "offset": 324,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd72360",
+      "setter_rva": "0xd75fa0",
+      "label_hash": "0x3f3ed755",
+      "registration_rva": "0xd1672e",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_arm",
+      "offset": 319,
+      "size": 1,
+      "shift": 1,
+      "bits": 3,
+      "signed": false,
+      "getter_rva": "0xd725b0",
+      "setter_rva": "0xd764e0",
+      "label_hash": "0xac83905c",
+      "registration_rva": "0xd167cf",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_elbow",
+      "offset": 321,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd725c0",
+      "setter_rva": "0xd76580",
+      "label_hash": "0xd0dc0b40",
+      "registration_rva": "0xd16870",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_wrist",
+      "offset": 323,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": false,
+      "getter_rva": "0xd72600",
+      "setter_rva": "0xd76800",
+      "label_hash": "0xe779a4c2",
+      "registration_rva": "0xd16911",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_fingers",
+      "offset": 325,
+      "size": 1,
+      "shift": 0,
+      "bits": 4,
+      "signed": true,
+      "getter_rva": "0xd725d0",
+      "setter_rva": "0xd76620",
+      "label_hash": "0x4eee9d2e",
+      "registration_rva": "0xd169b2",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_arm_home_color",
+      "offset": 318,
+      "size": 1,
+      "shift": 5,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cce0",
+      "setter_rva": "0x57acc0",
+      "label_hash": "0x19696a99",
+      "registration_rva": "0xd15034",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_elbow_home_color",
+      "offset": 320,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd00",
+      "setter_rva": "0x57ae40",
+      "label_hash": "0x45cf0f65",
+      "registration_rva": "0xd15177",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_wrist_home_color",
+      "offset": 322,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd80",
+      "setter_rva": "0x57b480",
+      "label_hash": "0xbce6d86a",
+      "registration_rva": "0xd152b3",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_fingers_home_color",
+      "offset": 324,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd20",
+      "setter_rva": "0x57ae80",
+      "label_hash": "0x41c8e1e7",
+      "registration_rva": "0xd153ef",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_arm_home_color",
+      "offset": 319,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cef0",
+      "setter_rva": "0x57d220",
+      "label_hash": "0xc09f56d7",
+      "registration_rva": "0xd1552b",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_elbow_home_color",
+      "offset": 321,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf10",
+      "setter_rva": "0x57d400",
+      "label_hash": "0x45ac89f",
+      "registration_rva": "0xd15667",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_wrist_home_color",
+      "offset": 323,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf90",
+      "setter_rva": "0x57db70",
+      "label_hash": "0xfd731f90",
+      "registration_rva": "0xd157a3",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_fingers_home_color",
+      "offset": 325,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf30",
+      "setter_rva": "0x57d440",
+      "label_hash": "0x1ce16f22",
+      "registration_rva": "0xd158df",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_arm_away_color",
+      "offset": 318,
+      "size": 2,
+      "shift": 7,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17ccd0",
+      "setter_rva": "0x57aca0",
+      "label_hash": "0xd82ba93a",
+      "registration_rva": "0xd150d9",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_elbow_away_color",
+      "offset": 320,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17ccf0",
+      "setter_rva": "0x57ae20",
+      "label_hash": "0x848dccc6",
+      "registration_rva": "0xd15215",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_wrist_away_color",
+      "offset": 322,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd70",
+      "setter_rva": "0x57b460",
+      "label_hash": "0x7da41bc9",
+      "registration_rva": "0xd15351",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.left_fingers_away_color",
+      "offset": 324,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cd10",
+      "setter_rva": "0x57ae60",
+      "label_hash": "0x808a2244",
+      "registration_rva": "0xd1548d",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_arm_away_color",
+      "offset": 319,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cee0",
+      "setter_rva": "0x57d200",
+      "label_hash": "0x1dd9574",
+      "registration_rva": "0xd155c9",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_elbow_away_color",
+      "offset": 321,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf00",
+      "setter_rva": "0x57d3e0",
+      "label_hash": "0xc5180b3c",
+      "registration_rva": "0xd15705",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_wrist_away_color",
+      "offset": 323,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf80",
+      "setter_rva": "0x57db50",
+      "label_hash": "0x3c31dc33",
+      "registration_rva": "0xd15841",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.right_fingers_away_color",
+      "offset": 325,
+      "size": 1,
+      "shift": 6,
+      "bits": 2,
+      "signed": false,
+      "getter_rva": "0x17cf20",
+      "setter_rva": "0x57d420",
+      "label_hash": "0xdda3ac81",
+      "registration_rva": "0xd1597d",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    }
+  ],
+  "colorways_included": false,
+  "live_write_validated": false
+}

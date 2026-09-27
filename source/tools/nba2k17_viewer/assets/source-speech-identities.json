@@ -1850,7 +1850,8 @@
     "ff94d166d780e5edc19831894ca624945be7c12b1132ef18dac18e64f60ee1b3": 1262,
     "ffceac5f99c4c824eff711e26f56f90dcfbad46b495da55c938af19a95d6cd5f": 1386,
     "ffdd97b32c5353ba1fb66893feecce1a121c4ca574e447f77e2c8adb9a3e30b8": 642,
-    "9c4952c21c856188883d10fb120e8cc5b1a6e6a024237d73d1e04723de3a6ff9": 65535
+    "9c4952c21c856188883d10fb120e8cc5b1a6e6a024237d73d1e04723de3a6ff9": 65535,
+    "c8af93e76d588768e28545e2366bf161c99dd67e80b3333c788224b66791db32": 65535
   },
   "evidence": [
     {
@@ -1876,6 +1877,10 @@
     {
       "path": ".project/research/reggie-miller-2026-09-14/capture.json",
       "sha256": "dc616d10b03c820ca297e9daaf3ff3aef796a46b814be75f8c9793679ba739dc"
+    },
+    {
+      "path": ".project/research/headband-2026-09-16/third-full-roster/capture.json",
+      "sha256": "8615fb714ce035497778c07cae9f5dad33b2a1634e341051f3121f626e77cc91"
     }
   ],
   "native_evidence": {

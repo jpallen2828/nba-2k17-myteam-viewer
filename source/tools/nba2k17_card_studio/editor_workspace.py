@@ -134,6 +134,13 @@ class DataEditor(QWidget):
         self.tabs.setCurrentIndex(min(tab,self.tabs.count()-1))
         self.update_overall()
 
+        self.refresh_headband_controls()
+
+    def refresh_headband_controls(self):
+        logo = self.fields.get(('gear', 'headband_logo'))
+        if logo is not None:
+            logo.setEnabled(self.document.data['gear']['values'].get('headband') == 1)
+
     def update_overall(self):
         result = self.document.recalculate_overall()
         self.overall_live.setText(f"OVR {result.normalized * 100:.2f}" if result.normalized is not None else f"OVR {self.document.spec['overall']}")
@@ -367,6 +374,8 @@ class DataEditor(QWidget):
         self.document.data[section]['values'][key]=value
         self.document.data[section]['statuses'][key]='CUSTOM_AUTHORED' if value is not None else 'MISSING'
         self.refresh_tooltip(section,key)
+        if section == 'gear' and key == 'headband':
+            self.refresh_headband_controls()
         if section=='gameplay_metadata' and key=='dominant_hand':
             from nba2k17_viewer.hand_policy import match_dunk_hand
             match_dunk_hand(self.document.data)

@@ -1021,6 +1021,43 @@
         3
       ],
       "evidence_kind": "NATIVE_LABEL_REGISTERED_GETTER_AND_MATCHING_SETTER_MASK"
+    },
+    {
+      "field": "gear.headband",
+      "offset": 313,
+      "size": 1,
+      "shift": 4,
+      "bits": 2,
+      "signed": true,
+      "getter_rva": "0xd722e0",
+      "setter_rva": "0xd75b80",
+      "label_hash": "0x1f7ed8af",
+      "registration_rva": "0xd164a7",
+      "valid_option_ids": [
+        0,
+        1
+      ],
+      "evidence_kind": "NATIVE_GETTER_SETTER_AND_CONTROLLED_UI_CAPTURE"
+    },
+    {
+      "field": "gear.headband_logo",
+      "offset": 313,
+      "size": 2,
+      "shift": 6,
+      "bits": 3,
+      "signed": false,
+      "getter_rva": "0x17ca90",
+      "setter_rva": "0x9dd1a0",
+      "label_hash": "0x46b4ee00",
+      "registration_rva": "0xd16402",
+      "valid_option_ids": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "evidence_kind": "NATIVE_GETTER_SETTER_AND_CONTROLLED_UI_CAPTURE"
     }
   ],
   "colorways_included": false,

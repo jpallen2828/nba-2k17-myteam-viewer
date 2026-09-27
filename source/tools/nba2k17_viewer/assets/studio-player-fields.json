@@ -2258,6 +2258,60 @@
     },
     {
       "group": "Accessories",
+      "key": "headband",
+      "label": "Headband",
+      "options": [
+        {
+          "label": "No",
+          "value": 0
+        },
+        {
+          "label": "Yes",
+          "value": 1
+        }
+      ],
+      "option_source": {
+        "kind": "native_control_and_no_yes_no_capture",
+        "date": "2026-09-16"
+      }
+    },
+    {
+      "group": "Accessories",
+      "key": "headband_logo",
+      "label": "Headband Logo",
+      "options": [
+        {
+          "label": "Front Left",
+          "value": 0
+        },
+        {
+          "label": "Front",
+          "value": 1
+        },
+        {
+          "label": "Front Right",
+          "value": 2
+        },
+        {
+          "label": "Back",
+          "value": 3
+        },
+        {
+          "label": "No Logo",
+          "value": 4
+        }
+      ],
+      "option_source": {
+        "kind": "native_executable_enum_and_controlled_endpoints",
+        "file_offset": 24467640,
+        "count": 5
+      },
+      "enabled_when": {
+        "headband": 1
+      }
+    },
+    {
+      "group": "Accessories",
       "key": "left_arm",
       "label": "Left Arm",
       "options": [

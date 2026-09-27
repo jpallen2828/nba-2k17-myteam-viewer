@@ -2,13 +2,13 @@
 from datetime import datetime
 from pathlib import Path
 from PySide6.QtCore import Qt, QRect, QSize
-from PySide6.QtGui import QPixmap, QPainter, QColor, QFont
+from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QFontMetrics
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QVBoxLayout,
     QHBoxLayout, QGridLayout, QComboBox, QLineEdit, QCheckBox, QScrollArea,
     QFileDialog, QMessageBox, QSizePolicy)
 from .teams import TeamSession, POSITIONS, DRAFT_KEYS, POSITION_KEYS, draft_odds, bonus_odds
 from .archive_repository import project_root
-from .presentation import TIER_COLORS
+from .presentation import TIER_COLORS, BADGE_COLORS, section_values
 from nba2k17_catalog import tier_rank
 
 TITLES = {'custom': 'Create a Team', 'random': 'Random Team', 'draft': 'Draft a Team'}
@@ -130,6 +130,38 @@ class CustomRosterTile(QFrame):
         self.action_button.setEnabled(row is not None)
         layout.addWidget(self.action_button)
 
+class DraftStatLabel(QLabel):
+    """Keep draft statistics on one line, fitting even narrow choice panels."""
+    def __init__(self, text, color, alignment=Qt.AlignmentFlag.AlignLeft):
+        super().__init__(text)
+        self.color = color
+        self.pixel_size = None
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        self.setAlignment(alignment | Qt.AlignmentFlag.AlignVCenter)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(34)
+        self.fit_text()
+
+    def fit_text(self):
+        font = QFont(self.font())
+        font.setBold(True)
+        size = 26
+        while size > 8:
+            font.setPixelSize(size)
+            metrics = QFontMetrics(font)
+            if (metrics.horizontalAdvance(self.text()) <= self.contentsRect().width() - 4
+                    and metrics.height() <= self.contentsRect().height() - 2):
+                break
+            size -= 1
+        if size != self.pixel_size:
+            self.pixel_size = size
+            self.setStyleSheet(f'color: {self.color}; font-size: {size}px; font-weight: 700;')
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fit_text()
+
+
 class DraftChoice(QFrame):
     def __init__(self, workspace, row, compact=False):
         super().__init__()
@@ -143,10 +175,31 @@ class DraftChoice(QFrame):
         view.setStyleSheet('font-size: 11px; padding: 9px 3px;')
         view.clicked.connect(lambda: workspace.inspect(row))
         layout.addWidget(view)
+        card = workspace.owner.repository.cards[row['id']]
+        badges = section_values(card, 'badges')
+        self.badge_counts = {}
+        badge_grid = QGridLayout()
+        badge_grid.setHorizontalSpacing(12)
+        badge_grid.setVerticalSpacing(0)
+        for index, (level, title) in enumerate((('HALL_OF_FAME', 'HOF'), ('GOLD', 'Gold'),
+                                                ('SILVER', 'Silver'), ('BRONZE', 'Bronze'))):
+            count = sum(value == level for value in badges.values())
+            alignment = Qt.AlignmentFlag.AlignRight if index % 2 else Qt.AlignmentFlag.AlignLeft
+            indicator = DraftStatLabel(f'{title}: {count}', BADGE_COLORS[level], alignment)
+            self.badge_counts[level] = indicator
+            badge_grid.addWidget(indicator, index // 2, index % 2)
+        badge_grid.setColumnStretch(0, 1)
+        badge_grid.setColumnStretch(1, 1)
+        layout.addLayout(badge_grid)
         self.art = DraftArt(row.get('image_path'))
-        if compact:
-            self.art.setMinimumHeight(120)
+        # The artwork takes remaining space; a fixed minimum can force Qt to
+        # overlap the statistics at short window heights.
+        self.art.setMinimumHeight(0)
         layout.addWidget(self.art, 1)
+        three = section_values(card, 'attributes').get('open_shot_three')
+        self.open_three = DraftStatLabel(f'Open 3PT: {three if three is not None else "—"}',
+                                        '#60dce5', Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(self.open_three)
         name = QLabel(row['name']); name.setWordWrap(True)
         name.setTextFormat(Qt.TextFormat.PlainText)
         name.setMinimumHeight(18 if compact else 34)

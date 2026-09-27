@@ -1,4 +1,27 @@
-"""Explicit September 8 user corrections; original archive stays unchanged."""
+"""Explicit user corrections; original archive stays unchanged."""
+
+
+def apply_player_injection_corrections(card):
+    """Apply saved user choices after archive artwork and template resolution."""
+    from .face_ids import normalized_name
+    identity = card['identity']['values']
+    if normalized_name(identity.get('name') or '') != 'juliuserving':
+        return
+    updates = [('gameplay_metadata', 'face_id', 2301, 'USER_SUPPLIED_FACE_ID')]
+    if str(card['source']['source_card_id']) == '20430':
+        updates.append(('identity', 'jersey_number', '32', 'USER_CORRECTED'))
+    for domain, field, value, status in updates:
+        section = card[domain]
+        section['values'][field] = value
+        section.setdefault('statuses', {})[field] = status
+        section['missing_fields'] = [key for key in section.get('missing_fields', []) if key != field]
+        section['provenance'] = [p for p in section.get('provenance', [])
+                                 if not (p.get('source_site') == 'user_injection_correction' and p.get('field') == field)]
+        section['provenance'].append({'source_site': 'user_injection_correction',
+                                     'field': field, 'value': value, 'date': '2026-09-18',
+                                     'reason': 'User specified face 2301 for all Julius Erving cards and jersey 32 for the Nets card.'})
+
+
 CORRECTIONS = {
     '2098': ('Los Angeles Lakers', 1965, 'https://www.basketball-reference.com/teams/LAL/1965.html'),
     '2257': ('Los Angeles Lakers', 1992, 'https://www.basketball-reference.com/teams/LAL/1992.html'),

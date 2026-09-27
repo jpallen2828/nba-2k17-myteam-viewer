@@ -17,10 +17,11 @@ Download `NBA.2K17.MyTEAM.zip`, choose **Extract All**, and run `2K17 MyTEAM.exe
 
 ## Included
 
-- 2,130 available cards in the initial release, including the latest custom cards.
+- 2,170 available cards in v1.1.0, including all currently saved custom cards.
 - Original PNG artwork, preserved byte-for-byte. ZIP compression is lossless.
 - Filters for tiers, teams, positions, themes, collections, overall, and custom cards.
 - Create a Team, Random Team, and Draft a Team modes.
+- Draft choices show badge-tier counts and Open 3PT ratings, including final Diamond/Amethyst rounds.
 - Integrated Card Studio with editable ratings, tendencies, signatures, shoes, accessories, badges, and hot zones.
 - Custom-card imports, disable/re-enable/remove controls, and editable teams and years.
 - Saved reusable player templates for injection, with preview, verification, and undo.

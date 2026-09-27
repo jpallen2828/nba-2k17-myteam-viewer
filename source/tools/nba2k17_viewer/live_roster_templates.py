@@ -87,6 +87,7 @@ def load_roster_templates(path, *, data_root=None, include_validation=True):
         from .native_roster_templates import apply_native_templates
         apply_native_templates(payload,data/'curation/native_roster_templates.json',data)
         apply_scanned_templates(payload,data/'curation/selected_roster_templates.json',data)
+        apply_scanned_templates(payload,data/'curation/rasheed_roster_template.json',data)
     return payload
 
 

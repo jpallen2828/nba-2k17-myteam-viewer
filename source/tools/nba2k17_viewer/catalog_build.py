@@ -14,7 +14,7 @@ import time
 from PIL import Image
 from nba2k17_catalog import exclusion_reason
 from .archive_repository import iter_audit, project_root
-from .user_identity_corrections import apply_identity_correction
+from .user_identity_corrections import apply_identity_correction, apply_player_injection_corrections
 from .year_audit import load_year_audit, apply_year_audit
 from .live_tendencies import load_live_tendencies, apply_live_tendencies
 from .tendency_estimates import load_tendency_estimates, apply_tendency_estimate
@@ -354,6 +354,7 @@ def build(root=None):
         # Export only after all overlays, including completions and authored cards.
         from .hand_policy import match_dunk_hand
         match_dunk_hand(record['card'])
+        apply_player_injection_corrections(record['card'])
         record['card']['injection'] = build_injection_profile(CanonicalCard.from_dict(record['card']))
     # Imports are appended after archive curation: never overwrite authored values.
     from .custom_import import imported_records
@@ -363,6 +364,7 @@ def build(root=None):
         apply_user_signatures(record, user_signatures.get(str(record['source_card_id'])))
         from .hand_policy import match_dunk_hand
         match_dunk_hand(record['card'])
+        apply_player_injection_corrections(record['card'])
         record['card']['injection'] = build_injection_profile(CanonicalCard.from_dict(record['card']))
         records.append(record)
     for imported_file in sorted((data / 'curation/studio_imports').glob('custom-*/*')):

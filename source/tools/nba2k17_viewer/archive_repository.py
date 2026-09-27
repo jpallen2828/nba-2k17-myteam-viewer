@@ -292,6 +292,8 @@ class ArchiveRepository:
                 identity['jersey_number'] = jerseys.pop()
                 card['identity']['statuses']['jersey_number'] = 'WEB_CARD_SPECIFIC'
                 card['identity']['raw_labels']['jersey_number'] = 'Visually reviewed original card artwork'
+        from .user_identity_corrections import apply_player_injection_corrections
+        apply_player_injection_corrections(card)
         name = identity.get("name") or f"Unparsed card #{card_id}"
         row = {"id": uid, "source_card_id": card_id, "name": name, "overall": identity.get("overall"),
                "tier": identity.get("tier"), "team": identity.get("team"), "theme": identity.get("theme"),

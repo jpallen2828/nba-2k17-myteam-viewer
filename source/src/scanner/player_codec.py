@@ -124,6 +124,8 @@ def encode(record, field, value):
         elif isinstance(value, str) and value.isascii() and value.isdecimal() and str(int(value)) == value:
             value = int(value)
     elif codec == 'enum' and isinstance(value, str):
+        if field.get('field') in ('identity.primary_position', 'identity.secondary_position'):
+            value = value.strip().upper()
         if value not in field.get('labels', {}):
             raise ValueError('Unmapped enum label: ' + value)
         value = field['labels'][value]

@@ -9886,7 +9886,8 @@
       "39c85e3eb2e678cbeb808be0c09267b2c0ff1a403748996a0882faaa02aa97db": 4378,
       "6c69362ef20035bea8f525ed169cc97804942e25d334616541006976ba8505d8": 2712,
       "e714bfebf5c817aeb11450114e829b3d97133f28d577ad3fc134a3ae4d6b36bc": 2142,
-      "9c4952c21c856188883d10fb120e8cc5b1a6e6a024237d73d1e04723de3a6ff9": 4800
+      "9c4952c21c856188883d10fb120e8cc5b1a6e6a024237d73d1e04723de3a6ff9": 4800,
+      "c8af93e76d588768e28545e2366bf161c99dd67e80b3333c788224b66791db32": 7081
     },
     "evidence_sha256": "6046789358f3c977a9e1114701c5a8203d6794041599b0d33ff63906dd7c84ae",
     "additional_capture_evidence": [
@@ -9901,6 +9902,10 @@
       {
         "path": ".project/research/reggie-miller-2026-09-14/capture.json",
         "sha256": "dc616d10b03c820ca297e9daaf3ff3aef796a46b814be75f8c9793679ba739dc"
+      },
+      {
+        "path": ".project/research/headband-2026-09-16/third-full-roster/capture.json",
+        "sha256": "8615fb714ce035497778c07cae9f5dad33b2a1634e341051f3121f626e77cc91"
       }
     ]
   },

@@ -6,7 +6,7 @@ from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QFontMetrics
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QVBoxLayout,
     QHBoxLayout, QGridLayout, QComboBox, QLineEdit, QCheckBox, QScrollArea,
     QFileDialog, QMessageBox, QSizePolicy)
-from .teams import TeamSession, POSITIONS, DRAFT_KEYS, POSITION_KEYS, draft_odds, bonus_odds
+from .teams import TeamSession, POSITIONS, DRAFT_KEYS, POSITION_KEYS, draft_odds, bonus_odds, bonus_round_name, percentage_text
 from .archive_repository import project_root
 from .presentation import TIER_COLORS, BADGE_COLORS, section_values
 from nba2k17_catalog import tier_rank
@@ -247,9 +247,9 @@ class TeamWorkspace(QWidget):
             self.custom_toggle.hide()
         if kind == 'draft':
             self.odds = QComboBox()
-            for name in ('Baller', 'Default', 'Budget'):
-                self.odds.addItem(f'{name} Draft', name.lower())
-                self.odds.setItemData(self.odds.count() - 1, self.odds_tooltip(name.lower()), Qt.ItemDataRole.ToolTipRole)
+            for name in ('Baller', 'Default', 'Budget', 'Super Budget'):
+                self.odds.addItem(f'{name} Draft', name.lower().replace(' ', '_'))
+                self.odds.setItemData(self.odds.count() - 1, self.odds_tooltip(name.lower().replace(' ', '_')), Qt.ItemDataRole.ToolTipRole)
             self.odds.setCurrentIndex(1)
             self.odds.setAccessibleName('Draft odds mode')
             self.odds.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
@@ -391,11 +391,13 @@ class TeamWorkspace(QWidget):
 
     @staticmethod
     def odds_tooltip(mode):
-        lines = [f'<div style="font-size:19.5px; font-weight:700;"><b>{mode.title()} Draft — odds per choice</b><table cellpadding="3"><tr><th align="left">Tier</th><th>Starter</th><th>Backup</th><th>Deep bench</th></tr>']
+        font_size = 14 if mode == 'super_budget' else 19.5
+        mode_name = mode.replace('_', ' ').title()
+        lines = [f'<div style="font-size:{font_size}px; font-weight:700;"><b>{mode_name} Draft — odds per choice</b><table cellpadding="3"><tr><th align="left">Tier</th><th>Starter</th><th>Bench</th><th>Deep bench</th></tr>']
         tables = [dict(draft_odds(mode, role)) for role in ('starter', 'backup', 'bench')]
         for tier in tables[0]:
-            lines.append('<tr><td align="left" style="white-space:nowrap;">' + tier.replace(' ', '&nbsp;') + '</td>' + ''.join(f'<td>{table[tier] * 100:.5g}%</td>' for table in tables) + '</tr>')
-        lines.append('</table><b>' + ('Amethyst' if mode == 'budget' else 'Diamond') + ' round:</b> ' + ' · '.join(f'{tier} {chance * 100:g}%' for tier, chance in bonus_odds(mode)))
+            lines.append('<tr><td align="left" style="white-space:nowrap;">' + tier.replace(' ', '&nbsp;') + '</td>' + ''.join(f'<td style="white-space:nowrap;">{percentage_text(table[tier])}</td>' for table in tables) + '</tr>')
+        lines.append('</table><b>' + bonus_round_name(mode) + ' round:</b> ' + ' · '.join(f'{tier} {percentage_text(chance)}' for tier, chance in bonus_odds(mode)))
         lines.append('<br>All five choices roll independently. Players cannot repeat.<br>If a tier has no eligible player, another eligible tier is used.')
         return ''.join(lines) + '</div>'
 
@@ -416,7 +418,7 @@ class TeamWorkspace(QWidget):
             self.show_odds()
             progress = bool(self.session.selected or self.session.pending)
             self.odds.setEnabled(not progress); self.custom_toggle.setEnabled(not self.session.pending)
-            bonus = 'Amethyst' if self.session.mode == 'budget' else 'Diamond'
+            bonus = bonus_round_name(self.session.mode)
             self.notice.setText(f'Current pack: {slot_label(self.session.pending)}. Click its slot to resume.' if self.session.pending else f'{bonus} bonus round unlocks after all 12 regular picks.' if len(lineup) < 12 else 'Choose your bonus player.' if len(lineup) == 12 else 'Team complete — save or export your lineup.')
             keys = tuple(f'{role}|{p}' for role in ('starter', 'backup') for p in POSITIONS) + DRAFT_KEYS[10:]
         else:
@@ -434,7 +436,7 @@ class TeamWorkspace(QWidget):
                 tile.action_button.setEnabled(row is not None)
                 self.roster_layout.addWidget(tile, 0, index)
             else:
-                title = ('Amethyst round' if self.session.mode == 'budget' else 'Diamond round') if key == 'bonus' else slot_label(key)
+                title = (bonus_round_name(self.session.mode) + ' round') if key == 'bonus' else slot_label(key)
                 tile = DraftRosterTile(row, title, 'View card' if row else 'Resume pack' if key == self.session.pending else 'Open pack', inspect if row else lambda checked=False, k=key: self.open_pack(k))
                 enabled = bool(row) or (not self.session.pending or key == self.session.pending)
                 if key.startswith('bench'):

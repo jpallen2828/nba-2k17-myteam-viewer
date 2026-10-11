@@ -4,6 +4,9 @@ import random
 import re
 import unicodedata
 from pathlib import Path
+from fractions import Fraction
+from decimal import Decimal, localcontext
+from math import lcm
 
 POSITIONS = ('PG', 'SG', 'SF', 'PF', 'C')
 TIERS = ('Pink Diamond', 'Diamond', 'Amethyst', 'Ruby', 'Sapphire', 'Emerald', 'Gold', 'Silver', 'Bronze', 'Onyx')
@@ -14,6 +17,36 @@ ODDS = {
     'budget': {'starter': (.001, .002, .097, .40, .40, .10), 'backup': (.0005, .001, .0185, .15, .60, .23), 'bench': (.000005, .00001, .000095, .001, .15, .84889)},
 }
 POSITION_KEYS = tuple(f'{role}|{pos}' for pos in POSITIONS for role in ('starter', 'backup'))
+DRAFT_MODES = (*ODDS, 'super_budget')
+# Exact percentages keep even the rarest draw reachable and preserve equal splits.
+SUPER_BUDGET_PERCENTAGES = {
+    'starter': ('0.0000001', '0.00001', '0.0001', '0.01', '1', '15', '25', '25', '20', '0.001'),
+    'backup': ('0.000000001', '0.0000001', '0.00001', '0.001', '0.1', '5', '15', '45', '30', '0.00001'),
+    'bench': ('0.000000000001', '0.0000000001', '0.00000001', '0.000001', '0.0001', '0.001', '1', '2', '97', '0.00000001'),
+}
+
+
+def super_budget_odds(role):
+    values = dict(zip(TIERS, map(Fraction, SUPER_BUDGET_PERCENTAGES[role])))
+    targets = {'starter': TIERS[5:9], 'backup': TIERS[6:9], 'bench': TIERS[7:9]}[role]
+    adjustment = (100 - sum(values.values())) / len(targets)
+    for tier in targets:
+        values[tier] += adjustment
+    return [(tier, value / 100) for tier, value in values.items()]
+
+
+def percentage_text(chance):
+    """Plain decimal percentages; recurring values display to 15 decimal places."""
+    if not isinstance(chance, Fraction):
+        return f'{chance * 100:.5g}%'
+    with localcontext() as context:
+        context.prec = 50
+        value = Decimal(chance.numerator) * 100 / Decimal(chance.denominator)
+        return format(value, '.15f').rstrip('0').rstrip('.') + '%'
+
+
+def bonus_round_name(mode):
+    return {'budget': 'Amethyst', 'super_budget': 'Sapphire'}.get(mode, 'Diamond')
 DRAFT_KEYS = POSITION_KEYS + ('bench|1', 'bench|2', 'bonus')
 LINEUP_KEYS = tuple(f'{role}|{pos}' for role in ('starter', 'backup') for pos in POSITIONS) + DRAFT_KEYS[10:]
 
@@ -22,6 +55,8 @@ def player_key(row):
     return ''.join(c for c in unicodedata.normalize('NFKD', name).casefold() if c.isalnum())
 
 def draft_odds(mode, role):
+    if mode == 'super_budget':
+        return super_budget_odds(role)
     result = {}
     for tier, chance in zip(BASE_TIERS, ODDS[mode][role]):
         targets = ('Ruby', 'Sapphire', 'Emerald', 'Gold') if tier == 'Gold' else ('Bronze', 'Onyx') if tier == 'Bronze' else (tier,)
@@ -64,12 +99,23 @@ def draft_odds(mode, role):
     return list(result.items())
 
 def bonus_odds(mode):
+    if mode == 'super_budget':
+        return list(zip(TIERS[:5], (Fraction(value) / 100 for value in ('0.001', '0.01', '0.1', '1', '98.889'))))
     if mode == 'budget':
         return [('Pink Diamond', .001), ('Diamond', .019), ('Amethyst', .98)]
     pink = .50 if mode == 'baller' else .10
     return [('Pink Diamond', pink), ('Diamond', 1 - pink)]
 
 def roll(table, rng):
+    if all(isinstance(chance, Fraction) for _, chance in table):
+        denominator = lcm(*(chance.denominator for _, chance in table))
+        weights = [(tier, chance.numerator * (denominator // chance.denominator)) for tier, chance in table]
+        ticket = rng.randrange(sum(weight for _, weight in weights))
+        for tier, weight in weights:
+            if ticket < weight:
+                return tier
+            ticket -= weight
+        raise AssertionError('Draw outside probability table')
     value = rng.random()
     for tier, chance in table:
         value -= chance
@@ -175,7 +221,7 @@ class TeamSession:
         obj = cls(rows, data.get('kind'))
         obj.mode = data.get('mode', 'default')
         obj.include_custom = data.get('include_custom', True)
-        if obj.mode not in ODDS or type(obj.include_custom) is not bool:
+        if obj.mode not in DRAFT_MODES or type(obj.include_custom) is not bool:
             raise ValueError('Invalid draft settings')
         obj.selected, obj.custom = data.get('selected', {}), data.get('custom', [])
         obj.pending, obj.options = data.get('pending'), data.get('options', [])

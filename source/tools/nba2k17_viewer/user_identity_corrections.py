@@ -5,11 +5,19 @@ def apply_player_injection_corrections(card):
     """Apply saved user choices after archive artwork and template resolution."""
     from .face_ids import normalized_name
     identity = card['identity']['values']
-    if normalized_name(identity.get('name') or '') != 'juliuserving':
+    name = normalized_name(identity.get('name') or '')
+    if name == 'domantassabonis':
+        updates = [('gameplay_metadata', 'face_id', 1, 'USER_SUPPLIED_FACE_ID')]
+        date = '2026-10-02'
+        reason = 'User specified face ID 1 for all Domantas Sabonis cards.'
+    elif name == 'juliuserving':
+        updates = [('gameplay_metadata', 'face_id', 2301, 'USER_SUPPLIED_FACE_ID')]
+        date = '2026-09-18'
+        reason = 'User specified face 2301 for all Julius Erving cards and jersey 32 for the Nets card.'
+        if str(card['source']['source_card_id']) == '20430':
+            updates.append(('identity', 'jersey_number', '32', 'USER_CORRECTED'))
+    else:
         return
-    updates = [('gameplay_metadata', 'face_id', 2301, 'USER_SUPPLIED_FACE_ID')]
-    if str(card['source']['source_card_id']) == '20430':
-        updates.append(('identity', 'jersey_number', '32', 'USER_CORRECTED'))
     for domain, field, value, status in updates:
         section = card[domain]
         section['values'][field] = value
@@ -18,8 +26,8 @@ def apply_player_injection_corrections(card):
         section['provenance'] = [p for p in section.get('provenance', [])
                                  if not (p.get('source_site') == 'user_injection_correction' and p.get('field') == field)]
         section['provenance'].append({'source_site': 'user_injection_correction',
-                                     'field': field, 'value': value, 'date': '2026-09-18',
-                                     'reason': 'User specified face 2301 for all Julius Erving cards and jersey 32 for the Nets card.'})
+                                     'field': field, 'value': value, 'date': date,
+                                     'reason': reason})
 
 
 CORRECTIONS = {

@@ -13,15 +13,18 @@ Download `NBA.2K17.MyTEAM.zip`, choose **Extract All**, and run `2K17 MyTEAM.exe
 <tr><td><img src="docs/screenshots/draft-screen.png" alt="Draft card choices"><br>Draft a lineup</td><td><img src="docs/screenshots/random-team.png" alt="Random team generator"><br>Generate a random team</td></tr>
 <tr><td><img src="docs/screenshots/card-studio.png" alt="Integrated Card Studio"><br>Create custom cards</td><td><img src="docs/screenshots/player-data.png" alt="Editable signature animations"><br>Edit player data</td></tr>
 <tr><td><img src="docs/screenshots/injection-screen.png" alt="Roster injection setup"><br>Prepare a roster injection</td><td><img src="docs/screenshots/card-details.png" alt="Card details and ratings"><br>Inspect player ratings</td></tr>
+<tr><td><img src="docs/screenshots/super-budget-mode.png" alt="Super Budget draft mode"><br>Super Budget draft</td><td><img src="docs/screenshots/sapphire-round.png" alt="Sapphire bonus round"><br>Sapphire bonus round</td></tr>
 </table>
 
 ## Included
 
-- 2,170 available cards in v1.1.0, including all currently saved custom cards.
+- 2,181 available cards in v1.2.0, including all currently saved custom cards.
 - Original PNG artwork, preserved byte-for-byte. ZIP compression is lossless.
 - Filters for tiers, teams, positions, themes, collections, overall, and custom cards.
 - Create a Team, Random Team, and Draft a Team modes.
-- Draft choices show badge-tier counts and Open 3PT ratings, including final Diamond/Amethyst rounds.
+- Four draft settings: Baller, Default, Budget, and Super Budget. Hover over the setting for odds per choice.
+- Super Budget favors lower tiers and ends with a Sapphire round (98.889% Sapphire, with small chances of Ruby through Pink Diamond).
+- Draft choices show badge-tier counts and Open 3PT ratings, including final Diamond/Amethyst/Sapphire rounds.
 - Integrated Card Studio with editable ratings, tendencies, signatures, shoes, accessories, badges, and hot zones.
 - Custom-card imports, disable/re-enable/remove controls, and editable teams and years.
 - Saved reusable player templates for injection, with preview, verification, and undo.

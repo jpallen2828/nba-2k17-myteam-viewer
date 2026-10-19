@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from hashlib import sha256
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -58,6 +59,27 @@ def _name(raw):
     last = utf16_fixed_field(raw, 0, 0x24)
     name = (first + ' ' + last).strip()
     return name or 'Unnamed slot'
+
+
+def profile_overall(profile):
+    value = profile.get('source_card_identity', {}).get('overall')
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 25 <= value <= 99:
+        raise ValueError('Missing or invalid saved card overall; cannot rank Blacktop injection.')
+    return value
+
+
+def ranked_profiles(profiles):
+    # Stable ties preserve the displayed draft order.
+    return sorted(profiles, key=profile_overall, reverse=True)
+
+
+def live_overall(raw):
+    # Build-verified native cached normalized OVR, independently validated on
+    # all 1,418 team-referenced records. Read only; never force recalculation.
+    value = struct.unpack_from('<f', raw, 0x150)[0]
+    if not math.isfinite(value) or not .25 <= value <= 1:
+        raise ValueError('Live destination overall is unavailable. Reopen the player browser and scan again.')
+    return min(99, math.floor(value * 100 + .5))
 
 
 def select_roster_process(processes, registry, *, progress=None, metrics=None):
@@ -210,11 +232,36 @@ def position_slot_assignment(source_positions, destination_positions):
             if best is None or candidate[0] > best[0] or (candidate[0] == best[0] and candidate[1] < best[1]):
                 best = candidate
         return best
-    return list(assign(0, 0)[1])
+    try:
+        return list(assign(0, 0)[1])
+    finally:
+        # Recursive cached functions form a cycle; release the search table now.
+        assign.cache_clear()
+
+
+def blacktop_selection(reader, module_base, teams):
+    """Resolve the player-browser selection through two observed native roots.
+
+    Blacktop and Play Now share canonical team records. These roots identify
+    the selected live team, not a unique game-mode flag or a private copy.
+    """
+    roots = (0x2233220, 0x673d160)
+    pointers = [struct.unpack('<Q', reader.read_or_raise(module_base + rva, 8))[0] for rva in roots]
+    if not pointers[0] or pointers[0] != pointers[1]:
+        raise ValueError('Blacktop player selection is not stable. Open the Blacktop player browser and scan again.')
+    matches = [t for t in teams if t['enabled'] and not t['deferred_all_star']
+               and any(s['player'] == pointers[0] for s in t['slots'])]
+    if len(matches) != 1:
+        raise ValueError('The selected Blacktop player does not resolve to one supported NBA team. Select a current or historic team and scan again.')
+    # A second read detects selection changes during this bounded probe.
+    if any(reader.read_or_raise(module_base + rva, 8) != struct.pack('<Q', pointers[0]) for rva in roots):
+        raise ValueError('Blacktop selection changed while scanning. Scan again.')
+    return {'team_key': matches[0]['key'], 'team': matches[0]['label'],
+            'selected_player': pointers[0], 'root_rvas': list(roots)}
 
 
 class RosterSession:
-    def __init__(self, roster_file, *, pid=None, progress=None, metrics=None, cancel_event=None):
+    def __init__(self, roster_file, *, pid=None, progress=None, metrics=None, cancel_event=None, live_mode='roster'):
         from scanner.windows_process import ProcessReader, find_processes
         from scanner.fingerprint import fingerprint_file
         from scanner.discovery.live import process_token
@@ -225,12 +272,16 @@ class RosterSession:
         self.compile_cache = {}
         self.invalidation_reasons = []
         self.registry = runtime_definition()
+        if live_mode not in ('roster', 'blacktop'):
+            raise ValueError('Unknown live injection mode')
+        self.live_mode = live_mode
+        self.blacktop_binding = None
         for field in self.registry['fields']:
             field['evidence'] = [{'sha256': field['evidence_sha256'], 'source': 'bundled_verified_registry'}]
-        self.roster_file = Path(roster_file).resolve()
-        if not self.roster_file.is_file():
+        self.roster_file = Path(roster_file).resolve() if live_mode == 'roster' else None
+        if live_mode == 'roster' and not self.roster_file.is_file():
             raise ValueError('The selected roster file no longer exists.')
-        self.file_hash = sha256(self.roster_file.read_bytes()).hexdigest()
+        self.file_hash = sha256(self.roster_file.read_bytes()).hexdigest() if self.roster_file else None
         self.file_stat = self._file_stat()
         with self.metrics.stage('process_attachment'):
             processes = find_processes()
@@ -263,6 +314,8 @@ class RosterSession:
         self.reader.__exit__(None, None, None)
 
     def _file_stat(self):
+        if self.roster_file is None:
+            return None
         s = self.roster_file.stat()
         return [s.st_size, s.st_mtime_ns]
 
@@ -292,6 +345,10 @@ class RosterSession:
                 raise ValueError('Live team references changed. Scan the loaded roster again.')
             if raw[160:] != t['identity_bytes']:
                 raise ValueError('Team metadata changed. Scan the loaded roster again.')
+        if getattr(self, 'blacktop_binding', None):
+            selected = blacktop_selection(self.reader, self.module_base, self.teams)
+            if selected['team_key'] != self.blacktop_binding['team_key']:
+                raise ValueError('The Blacktop team selection changed. Scan Blacktop again before injecting.')
         return True
 
     @measured('snapshot_checks')
@@ -368,18 +425,26 @@ class RosterSession:
         self.body_values = {}
         self._check_regions(self.regions)
         self.validate()
+        if getattr(self, 'live_mode', 'roster') == 'blacktop':
+            self.blacktop_binding = blacktop_selection(self.reader, self.module_base, self.teams)
+            self.automatic_slots([], next(t for t in self.teams if t['key'] == self.blacktop_binding['team_key']))
+            self.validate()
         return self.public_scan()
 
     def public_scan(self):
-        return {'pid': self.pid, 'process_start_token': self.process_start, 'roster_file': str(self.roster_file),
+        return {'pid': self.pid, 'process_start_token': self.process_start, 'roster_file': str(self.roster_file) if self.roster_file else None,
+                'live_mode': getattr(self, 'live_mode', 'roster'), 'blacktop_binding': deepcopy(getattr(self, 'blacktop_binding', None)),
                 'roster_sha256': self.file_hash, 'executable': self.executable,
-                'file_binding': 'User-selected loaded file; file selection does not load it in the game.',
+                'file_binding': ('Live player-browser selection; shared Play Now roster, no saved-file binding.' if self.roster_file is None
+                                 else 'User-selected loaded file; file selection does not load it in the game.'),
                 'teams': [{k: v for k, v in t.items() if k not in ('table_bytes', 'identity_bytes')} for t in self.teams if t['enabled']],
                 'all_team_tables': len(self.teams), 'unique_player_records': len(self.records),
                 'body_ownership': self.body_cache.summary() if hasattr(self, 'body_cache') else None}
 
     def diagnose_ownership(self, team_key, profiles=None, *, slots=None):
         """Resolve missing ownership before Inject; preview and Undo do not discover."""
+        if profiles is not None and getattr(self, 'live_mode', 'roster') == 'blacktop':
+            profiles = ranked_profiles(profiles)
         self.validate()
         self.refresh_mutable_records()
         team = next((t for t in self.teams if t['key'] == team_key and t['enabled']), None)
@@ -468,14 +533,23 @@ class RosterSession:
 
     def preflight(self, profiles, team_key, *, slots=None, live=True):
         """Collect all selected-lineup blockers; never scan process memory."""
+        if getattr(self, 'live_mode', 'roster') == 'blacktop':
+            profiles = ranked_profiles(profiles)
         if live:
             self.validate()
             self.refresh_mutable_records()
         blockers, missing, reasons = [], [], []
+        if getattr(self, 'blacktop_binding', None) and team_key != self.blacktop_binding['team_key']:
+            return {'blockers': ['Destination differs from the detected Blacktop team.'], 'missing_bodies': [],
+                    'message': 'Scan the selected Blacktop team again.'}
         team = next((t for t in self.teams if t['key'] == team_key and t['enabled']), None)
         if team is None:
             return {'blockers': ['Select a scanned NBA destination team.'], 'missing_bodies': [], 'message': 'Roster not scanned or destination unavailable.'}
-        wanted = [s['slot'] for s in self.position_matched_slots(profiles, team)] if slots is None and len(profiles)<=len(team['slots']) else list(slots or [])
+        wanted = [s['slot'] for s in self.automatic_slots(profiles, team)] if slots is None and len(profiles)<=len(team['slots']) else list(slots or [])
+        if getattr(self, 'live_mode', 'roster') == 'blacktop':
+            expected = [s['slot'] for s in self.automatic_slots(profiles, team)]
+            if wanted != expected:
+                blockers.append('Blacktop destinations must follow highest-overall order. Scan the team again.')
         if not profiles: blockers.append('Select a lineup first.')
         if len(wanted) != len(profiles) or len(set(wanted)) != len(wanted): blockers.append('Each card requires a different occupied destination slot.')
         changed, unchecked = 0, 0
@@ -512,6 +586,9 @@ class RosterSession:
         return {'blockers': blockers, 'missing_bodies': sorted(set(missing)), 'ownership_reasons': reasons,
                 'changed_bodies': changed, 'unchecked_bodies': unchecked, 'message': message.strip()}
 
+    def automatic_slots(self, profiles, team):
+        return self.position_matched_slots(profiles, team)
+
     def position_matched_slots(self, profiles, team):
         from scanner.player_codec import decode
         definitions = {f['field']: f for f in self.registry['fields']}
@@ -530,6 +607,8 @@ class RosterSession:
     def prepare(self, profiles, team_key, *, slots=None):
         from scanner.injection_transaction import Patch, Region
         from scanner.college_lookup import resolve_optional_college
+        if getattr(self, 'live_mode', 'roster') == 'blacktop':
+            profiles = ranked_profiles(profiles)
         self.validate()
         team = next((t for t in self.teams if t['key'] == team_key and t['enabled']), None)
         if team is None:
@@ -543,7 +622,7 @@ class RosterSession:
         if any(s is None for s in destination):
             raise ValueError('Only occupied, verified team slots can be replaced.')
         if slots is None:
-            destination = self.position_matched_slots(profiles, team)
+            destination = self.automatic_slots(profiles, team)
         if len({s['player'] for s in destination}) != len(destination):
             raise ValueError('Multiple destinations refer to the same player record.')
         check = self.preflight(profiles, team_key, slots=[s['slot'] for s in destination])
@@ -599,7 +678,11 @@ class RosterSession:
         self.patches = tuple(self.patches)
         self._check_regions(self.transaction_regions)
         self.validate()
-        self.prepared_report = {'team': team['label'], 'team_key': team_key, 'roster_file': str(self.roster_file),
+        self.prepared_report = {'team': team['label'], 'team_key': team_key,
+            'roster_file': str(self.roster_file) if self.roster_file else None,
+            'live_mode': getattr(self, 'live_mode', 'roster'),
+            'blacktop_binding': deepcopy(getattr(self, 'blacktop_binding', None)),
+            'assignment_policy': 'highest_card_ovr_to_highest_destination_ovr' if getattr(self, 'live_mode', 'roster') == 'blacktop' else 'explicit_slots' if slots is not None else 'position_matching',
             'players': self.plans, 'all_team_tables': len(self.teams), 'watched_player_records': len(self.records),
             'complete_card_supported': False, 'remaining_limits': [
                 'Shoes and accessories use native mappings; appearance still requires in-game validation.',
@@ -683,6 +766,10 @@ class RosterSession:
 
     @measured('linked_reference_checks')
     def validate_patch(self, patch, regions=None):
+        if getattr(self, 'blacktop_binding', None):
+            selected = blacktop_selection(self.reader, self.module_base, self.teams)
+            if selected['team_key'] != self.blacktop_binding['team_key']:
+                raise ValueError('Blacktop team changed before destination write. Scan Blacktop again.')
         if patch.region.startswith('player:'):
             from scanner.discovery.live import process_token
             if process_token(self.reader) != self.process_start:
@@ -832,3 +919,15 @@ class RosterSession:
         self.last_run = None
         result['restored_all_watched_regions'] = True
         return result
+
+
+class BlacktopSession(RosterSession):
+    """Fileless selection binding with the same field transaction and Undo."""
+    def __init__(self, roster_file=None, **kwargs):
+        super().__init__(None, live_mode='blacktop', **kwargs)
+
+    def automatic_slots(self, profiles, team):
+        for slot in team['slots']:
+            slot['overall'] = live_overall(self.records[slot['player']])
+        # Displayed OVR descending; equal OVRs keep native slot order.
+        return sorted(team['slots'], key=lambda s: (-s['overall'], s['slot']))[:len(profiles)]

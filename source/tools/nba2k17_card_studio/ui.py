@@ -273,7 +273,8 @@ class StudioWindow(QMainWindow):
         self.requested_scene_key=key;self.revision+=1
         self.timer.start()
     def start_render(self):
-        if self.worker and self.worker.isRunning():return
+        # Keep ownership until the queued finished signal has been handled.
+        if self.worker is not None:return
         self.worker=RenderWorker(self.pack,self.doc.clone(),self.revision,self)
         self.worker.scene_key=self.requested_scene_key
         self.worker.result.connect(self.rendered);self.worker.finished.connect(self.render_finished);self.worker.start()
@@ -306,7 +307,10 @@ class StudioWindow(QMainWindow):
 
     def choose_logo(self):
         picker=LogoPicker(self.pack,self.assets,self.doc.spec['team_logo'],self)
-        if picker.exec()==QDialog.DialogCode.Accepted:self.change('team_logo',picker.selected)
+        try:
+            if picker.exec()==QDialog.DialogCode.Accepted:self.change('team_logo',picker.selected)
+        finally:
+            picker.deleteLater()
     def use_sample(self,player_id,name):
         self.doc.portrait=None;self.doc.original_portrait=None
         self.doc.portrait_name=name+' — native cutout';self.doc.spec['player_id']=player_id
@@ -333,11 +337,14 @@ class StudioWindow(QMainWindow):
         self.review_cutout(original,current)
     def review_cutout(self,original,image):
         dialog=MaskEditor(original,image,self)
-        if dialog.exec()==QDialog.DialogCode.Accepted:
-            result=dialog.canvas.result()
-            if result.getbbox() is None:self.error('The entire player is transparent; keep some of the player before applying.');return
-            if not self.doc.original_portrait:self.doc.original_portrait=png_bytes(original)
-            self.doc.portrait=png_bytes(result);self.doc.spec['player_id']=None;self.doc.portrait_name=(self.doc.portrait_name or 'Player').removesuffix(' (cutout)')+' (cutout)';self.commit()
+        try:
+            if dialog.exec()==QDialog.DialogCode.Accepted:
+                result=dialog.canvas.result()
+                if result.getbbox() is None:self.error('The entire player is transparent; keep some of the player before applying.');return
+                if not self.doc.original_portrait:self.doc.original_portrait=png_bytes(original)
+                self.doc.portrait=png_bytes(result);self.doc.spec['player_id']=None;self.doc.portrait_name=(self.doc.portrait_name or 'Player').removesuffix(' (cutout)')+' (cutout)';self.commit()
+        finally:
+            dialog.deleteLater()
     def remove_background(self):
         if self.bg_worker or not (self.doc.portrait or self.doc.spec['player_id']):return
         self.bg_original=Image.open(BytesIO(self.doc.original_portrait)).convert('RGBA') if self.doc.original_portrait else self.current_portrait()
@@ -349,11 +356,15 @@ class StudioWindow(QMainWindow):
         self.bg_result=None;self.bg_worker.start();self.progress.show()
     def background_done(self,image,error):self.bg_result=(image,error)
     def background_finished(self):
-        cancelled=self.bg_worker.isInterruptionRequested();self.progress.close();self.bg_worker.deleteLater();self.bg_worker=None
+        cancelled=self.bg_worker.isInterruptionRequested()
+        self.progress.close();self.progress.deleteLater();self.progress=None
+        self.bg_worker.deleteLater();self.bg_worker=None
         image,error=self.bg_result or (None,'Background removal did not return a result.')
+        original=self.bg_original
+        self.bg_result=None;self.bg_original=None
         if cancelled:return
         if error:self.error(error)
-        elif image:self.review_cutout(self.bg_original,image)
+        elif image:self.review_cutout(original,image)
 
     def edit_data(self):
         if self.data_editor:return

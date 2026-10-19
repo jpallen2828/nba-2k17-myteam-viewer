@@ -133,22 +133,27 @@ def states(source):
 def inventory(source):
     entries = {}
     with closing(sqlite3.connect(Path(source).resolve().as_uri() + '?mode=ro', uri=True)) as db:
-        for (body,) in db.execute('SELECT record_json FROM cards'):
-            card = json.loads(body)['card']
-            if card.get('source', {}).get('provider') == 'user_authored':
-                entries[card['source']['source_card_id']] = card
+        # The manager only displays identity metadata. Avoid decoding all roster
+        # templates, evidence and attributes into Python objects for every card.
+        for cid, identity in db.execute("""
+                SELECT json_extract(record_json, '$.card.source.source_card_id'),
+                       json_extract(record_json, '$.card.identity.values')
+                FROM cards
+                WHERE json_extract(record_json, '$.card.source.provider') = 'user_authored'
+                """):
+            entries[cid] = json.loads(identity)
     root = data_root(source)
     for path in (root / 'curation/studio_imports').glob('custom-*/manifest.json') if root else ():
         card = json.loads(path.read_text(encoding='utf-8'))['record']['card']
-        entries[card['source']['source_card_id']] = card
+        entries[card['source']['source_card_id']] = card['identity']['values']
     state = states(source)
     teams = team_overrides(source)
     years = year_overrides(source)
-    return [dict(id=cid, name=c['identity']['values']['name'],
-                 overall=c['identity']['values'].get('overall'),
-                 year=years.get(cid, c['identity']['values'].get('card_year')),
-                 collection=c['identity']['values'].get('collection'),
-                 team=teams.get(cid, c['identity']['values'].get('team') or c['identity']['values'].get('franchise') or ''),
+    return [dict(id=cid, name=c['name'],
+                 overall=c.get('overall'),
+                 year=years.get(cid, c.get('card_year')),
+                 collection=c.get('collection'),
+                 team=teams.get(cid, c.get('team') or c.get('franchise') or ''),
                  disabled=state.get(cid) == 'disabled')
             for cid, c in entries.items() if state.get(cid) != 'deleted']
 
@@ -169,7 +174,7 @@ def set_state(source, ids, action):
     os.replace(pending, path)
     if action == 'deleted':
         # Tombstones prevent a later catalog rebuild from resurrecting deletions.
-        with sqlite3.connect(source) as db:
+        with closing(sqlite3.connect(source)) as db, db:
             db.executemany('DELETE FROM cards WHERE source_card_id=?', [(cid,) for cid in ids])
         parent = (root / 'curation/studio_imports').resolve()
         for cid in ids:

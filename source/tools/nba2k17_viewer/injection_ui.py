@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLa
 
     QLineEdit, QComboBox, QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView, QApplication)
 
-from .roster_injection import RosterSession, find_roster_files, default_roster_directory
+from .roster_injection import RosterSession, BlacktopSession, ranked_profiles, find_roster_files, default_roster_directory
 
 
 
@@ -60,11 +60,12 @@ class InjectionJob(QRunnable):
 
 class InjectionPanel(QFrame):
 
-    def __init__(self, owner, lineup):
+    def __init__(self, owner, lineup, *, blacktop=False):
 
         super().__init__()
 
         self.owner = owner
+        self.blacktop = blacktop
 
         from .injection_session import SessionManager
 
@@ -76,9 +77,17 @@ class InjectionPanel(QFrame):
 
         self.manager = owner.injection_manager
 
+        self.connection = getattr(owner, 'game_connection', None)
+        self._initializing = True
+        self._pending_connection_snapshot = None
+        self._display_session = None
+        self._applying_connection_snapshot = False
+
         self.released = False
 
         self.profiles = deepcopy([owner.repository.cards[row['id']]['injection'] for _, row in lineup])
+        if blacktop:
+            self.profiles = ranked_profiles(self.profiles)
 
         self.busy = False
 
@@ -104,7 +113,7 @@ class InjectionPanel(QFrame):
 
         top = QHBoxLayout()
 
-        title = QLabel('Inject team into NBA 2K17'); title.setObjectName('detailName')
+        title = QLabel('Blacktop injection' if blacktop else 'Inject team into NBA 2K17'); title.setObjectName('detailName')
 
         top.addWidget(title); top.addStretch()
 
@@ -116,6 +125,8 @@ class InjectionPanel(QFrame):
 
         hint = QLabel('Choose the roster file already loaded in offline Roster Creator, scan its live slots, then select a destination team. Changing this file selection does not load a roster in the game.')
 
+        if blacktop:
+            hint.setText('Keep the Blacktop player browser open on the destination team, then scan. Every drafted card, including the bonus, injects automatically: highest card OVR over highest live player OVR, in order. This updates the shared Play Now roster. Choose your Blacktop players after injection.')
         hint.setWordWrap(True); layout.addWidget(hint)
 
         folder = QHBoxLayout()
@@ -124,6 +135,11 @@ class InjectionPanel(QFrame):
 
         self.directory = QLineEdit(str(self.settings.value('directory', str(default_roster_directory()))))
 
+        confirmed_path = str(getattr(self.connection, 'roster_file', '') or
+                             getattr(self.session, 'roster_file', ''))
+        if confirmed_path:
+            self.directory.setText(str(Path(confirmed_path).parent))
+
         self.directory.setAccessibleName('Roster search folder'); folder.addWidget(self.directory, 1)
 
         self.browse = QPushButton('Browse…'); self.browse.clicked.connect(self.choose_folder); folder.addWidget(self.browse)
@@ -131,16 +147,20 @@ class InjectionPanel(QFrame):
         self.find_button = QPushButton('Find rosters'); self.find_button.clicked.connect(self.find_files); folder.addWidget(self.find_button)
 
         layout.addLayout(folder)
+        if blacktop:
+            for i in range(folder.count()): folder.itemAt(i).widget().hide()
 
         controls = QHBoxLayout()
 
-        controls.addWidget(QLabel('Loaded roster'))
+        roster_label = QLabel('Live source' if blacktop else 'Loaded roster')
+        controls.addWidget(roster_label)
 
         self.roster = QComboBox(); self.roster.setAccessibleName('Loaded roster file'); controls.addWidget(self.roster, 1)
 
         self.scan_button = QPushButton('Scan live roster'); self.scan_button.clicked.connect(self.scan); controls.addWidget(self.scan_button)
 
-        controls.addWidget(QLabel('Teams'))
+        teams_label = QLabel('Teams')
+        controls.addWidget(teams_label)
 
         self.kind = QComboBox(); self.kind.addItem('Current NBA', 'CURRENT'); self.kind.addItem('Historic NBA', 'HISTORIC')
 
@@ -153,6 +173,10 @@ class InjectionPanel(QFrame):
         self.team.currentIndexChanged.connect(self.preview_slots); controls.addWidget(self.team, 1)
 
         layout.addLayout(controls)
+        if blacktop:
+            self.roster.addItem('Blacktop / Play Now live player pool', None)
+            self.roster.setEnabled(False)
+            self.kind.hide(); teams_label.hide()
 
         self.scan_note = QLabel('Scan reads the roster currently open in the game. It does not change game data.')
 
@@ -172,7 +196,8 @@ class InjectionPanel(QFrame):
 
         layout.addWidget(self.table, 1)
 
-        self.status = QLabel('Game not attached. Select the loaded roster and scan to resolve current team slots.')
+        self.status = QLabel('Open the Blacktop player browser on the destination team, then click Scan Blacktop.' if blacktop
+                            else 'Game not attached. Select the loaded roster and scan to resolve current team slots.')
 
         self.status.setWordWrap(True); self.status.setObjectName('notice'); layout.addWidget(self.status)
 
@@ -203,9 +228,23 @@ class InjectionPanel(QFrame):
 
         layout.addLayout(actions)
 
-        self.find_files()
+        if not blacktop:
+            self.find_files(preferred_path=confirmed_path or None)
 
-        if self.session is not None and not self.manager.busy:
+        self._initializing = False
+
+        if self.connection is not None:
+            self.connection.snapshot_changed.connect(self.connection_snapshot)
+            self.connection.activity_changed.connect(self.connection_activity)
+            if not blacktop and not self.connection.roster_file and self.session_matches_selection():
+                existing_path = str(getattr(self.session, 'roster_file', '') or '')
+                if existing_path:
+                    self.connection.set_roster_path(existing_path)
+            if not self.manager.busy:
+                self.filter_teams()
+            self.update_controls()
+
+        elif self.session_matches_selection() and not self.manager.busy:
 
             def reuse(progress):
 
@@ -243,19 +282,97 @@ class InjectionPanel(QFrame):
 
         self.released = True
 
-        self.manager.cancel()
+        if self.busy:
+            self.manager.cancel()
+
+
+    def connection_busy(self):
+
+        return bool(self.connection is not None and self.connection.active)
+
+
+    def session_matches_selection(self):
+
+        session = self.session
+        if session is None or not getattr(session, 'valid', True):
+            return False
+        if (getattr(session, 'live_mode', 'roster') == 'blacktop') != self.blacktop:
+            return False
+        if self.blacktop:
+            return True
+        path = getattr(session, 'roster_file', None)
+        return path is None or (bool(self.roster.currentData()) and
+                               Path(path).resolve() == Path(self.roster.currentData()).resolve())
+
+
+    def discard_unselected_session(self):
+
+        if self.session is None or self.session_matches_selection():
+            return
+        if self.manager.reserve():
+            self.manager.run(lambda _: self.manager.discard(), lambda _: None)
+
+
+    @Slot(bool)
+    def connection_activity(self, active):
+
+        if self.released:
+            return
+        if not active and self._pending_connection_snapshot is not None:
+            snapshot, self._pending_connection_snapshot = self._pending_connection_snapshot, None
+            self.connection_snapshot(snapshot)
+        self.update_controls()
+
+
+    @Slot(object)
+    def connection_snapshot(self, snapshot):
+
+        if self.released:
+            return
+        if self.busy or self.manager.busy:
+            self._pending_connection_snapshot = snapshot
+            return
+        sync = snapshot.get('sync', {})
+        self._applying_connection_snapshot = True
+        if sync.get('state') == 'ready':
+            scan = sync.get('scan', {})
+            if (scan.get('live_mode', 'roster') == 'blacktop') != self.blacktop:
+                self.filter_teams()
+                self.status.setText('Click Scan Blacktop to detect the selected live team.' if self.blacktop
+                                    else 'Click Scan live roster to use the selected roster file.')
+                self._applying_connection_snapshot = False
+                self.update_controls()
+                return
+            path = scan.get('roster_file')
+            if path and path != self.roster.currentData():
+                self.directory.setText(str(Path(path).parent))
+                self.find_files(preferred_path=path, notify_connection=False)
+            if sync.get('changed') or sync.get('rebound') or self._display_session is not self.session:
+                self.filter_teams()
+                self.status.setText('Live roster synchronized. Select a destination team and press Inject.'
+                                    if self.team.currentData() else
+                                    'Live roster synchronized. The previous team is unavailable; select a destination team.')
+        elif sync.get('state') in ('stopped', 'unsupported', 'waiting', 'error') and not self.session_matches_selection():
+            self.filter_teams()
+            self.status.setText(sync.get('message', 'Waiting for the loaded roster.'))
+        self._applying_connection_snapshot = False
+        self.update_controls()
 
 
 
-    def invalidate(self, *_):
+    def invalidate(self, *_, notify_connection=True):
 
-        if not self.manager.busy: self.manager.discard()
+        if not self._initializing:
+            self.discard_unselected_session()
 
         self.prepared = False; self.team.clear()
 
         self.undo_button.setEnabled(False)
 
         self.status.setText('Ready to scan. Keep the selected roster open in NBA 2K17 and click Scan live roster.')
+
+        if notify_connection and self.connection is not None and not self._initializing:
+            self.connection.set_roster_path(self.roster.currentData() or '')
 
         self.update_controls()
 
@@ -267,7 +384,7 @@ class InjectionPanel(QFrame):
 
         if chosen:
 
-            self.directory.setText(chosen); self.invalidate(); self.find_files()
+            self.directory.setText(chosen); self.directory_edited(); self.find_files()
 
 
 
@@ -281,7 +398,7 @@ class InjectionPanel(QFrame):
 
 
 
-    def find_files(self):
+    def find_files(self, *_, preferred_path=None, notify_connection=True):
 
         previous = self.roster.currentData()
 
@@ -291,9 +408,9 @@ class InjectionPanel(QFrame):
 
         except (OSError, ValueError) as exc:
 
-            self.invalidate()
+            self.roster.blockSignals(True); self.roster.clear(); self.roster.blockSignals(False)
 
-            self.roster.clear()
+            if notify_connection: self.invalidate()
 
             self.status.setText(str(exc)); self.update_controls(); return
 
@@ -303,7 +420,7 @@ class InjectionPanel(QFrame):
 
             self.roster.addItem(p.name, str(p)); self.roster.setItemData(self.roster.count() - 1, str(p), Qt.ItemDataRole.ToolTipRole)
 
-        saved = previous or str(getattr(self.session, 'roster_file', '')) or self.settings.value('roster', '')
+        saved = preferred_path or previous or str(getattr(self.session, 'roster_file', '')) or self.settings.value('roster', '')
 
         index = self.roster.findData(saved)
 
@@ -313,13 +430,18 @@ class InjectionPanel(QFrame):
 
         self.roster.blockSignals(False)
 
-        if (previous is not None and previous != self.roster.currentData()) or self.session is None:
+        if notify_connection and ((previous is not None and previous != self.roster.currentData()) or self.session is None):
 
-            self.invalidate()
+            self.invalidate(notify_connection=False)
 
-        elif getattr(self.session, 'roster_file', None) is not None and str(self.session.roster_file) != self.roster.currentData():
+        elif notify_connection and getattr(self.session, 'roster_file', None) is not None and str(self.session.roster_file) != self.roster.currentData():
 
-            self.invalidate()
+            self.invalidate(notify_connection=False)
+
+        if (notify_connection and not self._initializing and self.connection is not None
+                and previous is not None and previous != self.roster.currentData()):
+            # Listing files does not confirm that the new first file is loaded.
+            self.connection.set_roster_path('')
 
         self.settings.setValue('directory', self.directory.text())
 
@@ -335,13 +457,18 @@ class InjectionPanel(QFrame):
 
 
 
-    def start(self, function, complete, *, writing=False):
+    def start(self, function, complete, *, writing=False, confirmed_path=None):
 
-        if self.busy or self.released or not self.manager.reserve(writing=writing):
+        if self.busy or self.released or self.connection_busy() or not self.manager.reserve(writing=writing):
 
-            return
+            return False
 
         self.busy = True; self.update_controls()
+
+        # Reserve first: the controller queues its refresh instead of racing
+        # this manual scan or discarding its future Undo binding as unselected.
+        if confirmed_path is not None and self.connection is not None:
+            self.connection.set_roster_path(confirmed_path)
 
         self.job = InjectionJob(lambda progress: self.manager.run(function, progress))
 
@@ -354,6 +481,8 @@ class InjectionPanel(QFrame):
         self.job.signals.error.connect(self.failed, Qt.ConnectionType.QueuedConnection)
 
         QThreadPool.globalInstance().start(self.job)
+
+        return True
 
 
 
@@ -375,15 +504,23 @@ class InjectionPanel(QFrame):
 
         self.busy = False
 
+        completion, self.completion = self.completion, None
+
+        self.job = None
+
         if self.released or self.manager.closing: return
 
         try:
 
-            self.completion(value)
+            completion(value)
 
         except Exception as exc:
 
             self.failed(str(exc))
+
+        if self._pending_connection_snapshot is not None and not self.connection_busy() and not self.manager.busy:
+            snapshot, self._pending_connection_snapshot = self._pending_connection_snapshot, None
+            self.connection_snapshot(snapshot)
 
         self.update_controls()
 
@@ -395,13 +532,17 @@ class InjectionPanel(QFrame):
 
         self.busy = False; self.prepared = False
 
+        self.job = None; self.completion = None
+
         if self.released or self.manager.closing: return
 
-        if self.session is not None and hasattr(self.session, 'save_failure'):
+        if (self.session is not None and hasattr(self.session, 'save_failure')
+                and not self.connection_busy() and self.manager.reserve()):
 
             try:
 
-                self.status.setToolTip('Diagnostic report: ' + self.session.save_failure(message))
+                report = self.manager.run(lambda _: self.session.save_failure(message), lambda _: None)
+                self.status.setToolTip('Diagnostic report: ' + report)
 
             except OSError:
 
@@ -409,7 +550,7 @@ class InjectionPanel(QFrame):
 
         if self.session is not None and not getattr(self.session, 'valid', True):
 
-            self.manager.discard()
+            self.discard_unselected_session()
 
             self.filter_teams()
 
@@ -423,9 +564,9 @@ class InjectionPanel(QFrame):
 
     def scan(self):
 
-        path = self.roster.currentData()
+        path = None if self.blacktop else self.roster.currentData()
 
-        if self.busy or self.manager.busy or not path:
+        if self.busy or self.manager.busy or self.connection_busy() or (not self.blacktop and not path):
 
             return
 
@@ -437,34 +578,45 @@ class InjectionPanel(QFrame):
 
         def run(progress):
 
-            return self.manager.replace(path, RosterSession, progress)
+            return self.manager.replace(path, BlacktopSession if self.blacktop else RosterSession, progress)
 
         def done(session):
 
             self.session = session
 
-            self.settings.setValue('roster', path)
+            if not self.blacktop:
+                self.settings.setValue('roster', path)
 
             self.filter_teams()
 
             message = self.status.text() if self.team.currentData() else 'The previous team is unavailable. Select a destination team.'
 
-            self.status.setText(f"Resolved {len(session.public_scan()['teams'])} NBA teams and {len(session.records):,} player records. {message}")
+            if self.blacktop:
+                self.status.setText(f"Detected {session.blacktop_binding['team']} in the live player browser. {message}")
+            else:
+                self.status.setText(f"Resolved {len(session.public_scan()['teams'])} NBA teams and {len(session.records):,} player records. {message}")
 
-        self.start(run, done)
+        self.start(run, done, confirmed_path=path)
 
 
 
     def filter_teams(self):
 
-        self.manager.selected_kind = self.kind.currentData()
+        if self.connection_busy() and not self._applying_connection_snapshot:
+            self.update_controls()
+            return
+
+        if not self.blacktop:
+            self.manager.selected_kind = self.kind.currentData()
 
         self.team.blockSignals(True); self.team.clear()
 
-        if self.session:
+        if self.session_matches_selection() and not self.manager.busy:
 
             teams = [t for t in self.session.teams if t['enabled'] and t['kind'] == self.kind.currentData()]
 
+            if self.blacktop:
+                teams = [t for t in self.session.teams if t['key'] == self.session.blacktop_binding['team_key']]
             if self.kind.currentData() == 'CURRENT':
 
                 teams.sort(key=lambda t: (t['nickname'].casefold(), t['label'].casefold()))
@@ -473,13 +625,15 @@ class InjectionPanel(QFrame):
 
                 self.team.addItem(f"{t['label']} · {len(t['slots'])} slots", t['key'])
 
-            remembered = self.selected_teams.get(self.kind.currentData())
+            remembered = None if self.blacktop else self.selected_teams.get(self.kind.currentData())
 
             if remembered is not None:
 
                 self.team.setCurrentIndex(self.team.findData(remembered))
 
         self.team.blockSignals(False); self.preview_slots()
+
+        self._display_session = self.session if not self.manager.busy and self.session_matches_selection() else None
 
 
 
@@ -489,15 +643,18 @@ class InjectionPanel(QFrame):
 
         self.slot_choices = []
 
-        team = next((t for t in self.session.teams if t['key'] == self.team.currentData()), None) if self.session else None
+        team = next((t for t in self.session.teams if t['key'] == self.team.currentData()), None) if self.session_matches_selection() and not self.manager.busy else None
 
-        if team:
+        if team and not self.blacktop:
 
             self.selected_teams[self.kind.currentData()] = team['key']
 
         remembered_slots = self.selected_slots.get(team['key']) if team else None
 
-        if team and team['key'] not in self.manual_slots and hasattr(self.session, 'position_matched_slots') and len(self.profiles) <= len(team['slots']):
+        if team and self.blacktop and hasattr(self.session, 'automatic_slots'):
+            remembered_slots = [s['slot'] for s in self.session.automatic_slots(self.profiles, team)]
+
+        if team and not self.blacktop and team['key'] not in self.manual_slots and hasattr(self.session, 'position_matched_slots') and len(self.profiles) <= len(team['slots']):
 
             remembered_slots = [s['slot'] for s in self.session.position_matched_slots(self.profiles, team)]
 
@@ -525,7 +682,8 @@ class InjectionPanel(QFrame):
 
                 for live in team['slots']:
 
-                    choice.addItem(f"{live['slot'] + 1} · {live['name']}", live['slot'])
+                    rating = f" · {live['overall']} OVR" if self.blacktop and 'overall' in live else ''
+                    choice.addItem(f"{live['slot'] + 1} · {live['name']}{rating}", live['slot'])
 
                 if remembered_slots is not None and i < len(remembered_slots):
 
@@ -542,6 +700,9 @@ class InjectionPanel(QFrame):
             choice.currentIndexChanged.connect(lambda _index, row=i: self.slot_changed(row))
 
             self.table.setCellWidget(i, 1, choice)
+            if self.blacktop:
+                choice.setEnabled(False)
+                choice.setToolTip('Automatically paired by overall: highest drafted card over highest live player.')
 
             self.slot_choices.append(choice)
 
@@ -557,7 +718,7 @@ class InjectionPanel(QFrame):
 
     def readiness(self):
 
-        if self.session is None or self.busy or self.manager.busy or not self.team.currentData(): return
+        if not self.session_matches_selection() or self.busy or self.manager.busy or self.connection_busy() or not self.team.currentData(): return
 
         if not hasattr(self.session, 'preflight'): return
 
@@ -633,13 +794,14 @@ class InjectionPanel(QFrame):
 
             origin = 'height; origin retained' if p.get('college',{}).get('resolution') == 'PRESERVED_DESTINATION' else 'height/origin'
 
-            self.table.setItem(i, 3, QTableWidgetItem(f"{len(p['fields'])} mapped fields + {origin}; gear unsupported{suffix}"))
+            self.table.setItem(i, 3, QTableWidgetItem(f"{len(p['fields'])} mapped fields + {origin}; shoes/accessories{suffix}"))
 
 
 
     def can_inject(self):
 
-        return not self.busy and not self.manager.busy and self.session is not None and bool(self.team.currentData()) and bool(self.profiles)
+        return (not self.busy and not self.manager.busy and not self.connection_busy()
+                and self.session_matches_selection() and bool(self.team.currentData()) and bool(self.profiles))
 
 
 
@@ -671,7 +833,8 @@ class InjectionPanel(QFrame):
 
             elapsed = f' in {seconds:.2f}s' if seconds is not None else ''
 
-            self.status.setText(f"Injected {result['cards_written']} card(s){elapsed}; {result['field_readback_count']:,} mapped fields matched readback. Gear and unresolved flags were retained. Inspect in-game, then save a separate test roster. Report: {result['report_directory']}")
+            next_step = ('Reopen the Blacktop player browser and select your players. The shared Play Now roster was updated.' if self.blacktop else 'Inspect in-game, then save a separate test roster.')
+            self.status.setText(f"Injected {result['cards_written']} card(s){elapsed}; {result['field_readback_count']:,} mapped fields matched readback. {next_step} Report: {result['report_directory']}")
 
         def run(progress):
 
@@ -719,7 +882,7 @@ class InjectionPanel(QFrame):
 
     def update_controls(self, *_):
 
-        busy = self.busy or self.manager.busy
+        busy = self.busy or self.manager.busy or self.connection_busy()
 
         self.table.setEnabled(not busy)
 
@@ -727,9 +890,12 @@ class InjectionPanel(QFrame):
 
             control.setEnabled(not busy)
 
-        self.scan_button.setEnabled(not busy and bool(self.roster.currentData()))
+        if self.blacktop:
+            self.directory.setEnabled(False); self.browse.setEnabled(False); self.find_button.setEnabled(False)
+            self.roster.setEnabled(False); self.kind.setEnabled(False)
+        self.scan_button.setEnabled(not busy and (self.blacktop or bool(self.roster.currentData())))
 
-        self.scan_button.setText('Scanning…' if self.busy and self.session is None else 'Scan live roster')
+        self.scan_button.setText('Scanning…' if self.busy and self.session is None else ('Scan Blacktop' if self.blacktop else 'Scan live roster'))
 
         if hasattr(self, 'prepare_button'):
 
@@ -739,5 +905,5 @@ class InjectionPanel(QFrame):
 
             self.inject_button.setEnabled(self.can_inject())
 
-            self.undo_button.setEnabled(not busy and self.session is not None and bool(getattr(self.session, 'last_run', None)))
+            self.undo_button.setEnabled(not busy and self.session_matches_selection() and bool(getattr(self.session, 'last_run', None)))
 

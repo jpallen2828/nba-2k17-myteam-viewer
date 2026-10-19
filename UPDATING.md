@@ -13,3 +13,5 @@ For an update:
 The helper reads the old folder without changing it. If the same imported file exists with different contents, it stops and asks you to use a freshly extracted destination rather than overwrite the conflict.
 
 Projects saved in your Documents folder or another location stay there. Studio save-folder preferences are stored in your Windows user settings. Manually copying an old database over the new one would discard updated bundled data; use the helper instead.
+
+Automatic draft saves live under `%LOCALAPPDATA%\NBA2K17MyTEAM\Drafts` and remain available when switching portable release folders. Blacktop saves from an earlier version retain all drafted cards; the obsolete optional-substitute selection is ignored. Every displayed card, including the bonus, is included in Blacktop injection.

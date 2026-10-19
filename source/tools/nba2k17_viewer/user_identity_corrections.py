@@ -10,6 +10,10 @@ def apply_player_injection_corrections(card):
         updates = [('gameplay_metadata', 'face_id', 1, 'USER_SUPPLIED_FACE_ID')]
         date = '2026-10-02'
         reason = 'User specified face ID 1 for all Domantas Sabonis cards.'
+    elif name == 'jonathangibson':
+        updates = [('gameplay_metadata', 'face_id', 1, 'USER_SUPPLIED_FACE_ID')]
+        date = '2026-10-10'
+        reason = 'User specified face ID 1 for Jonathan Gibson cards.'
     elif name == 'juliuserving':
         updates = [('gameplay_metadata', 'face_id', 2301, 'USER_SUPPLIED_FACE_ID')]
         date = '2026-09-18'

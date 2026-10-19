@@ -5,13 +5,13 @@ from PySide6.QtCore import Qt, QRect, QSize
 from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QFontMetrics
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QVBoxLayout,
     QHBoxLayout, QGridLayout, QComboBox, QLineEdit, QCheckBox, QScrollArea,
-    QFileDialog, QMessageBox, QSizePolicy)
+    QFileDialog, QMessageBox, QSizePolicy, QButtonGroup)
 from .teams import TeamSession, POSITIONS, DRAFT_KEYS, POSITION_KEYS, draft_odds, bonus_odds, bonus_round_name, percentage_text
 from .archive_repository import project_root
 from .presentation import TIER_COLORS, BADGE_COLORS, section_values
 from nba2k17_catalog import tier_rank
 
-TITLES = {'custom': 'Create a Team', 'random': 'Random Team', 'draft': 'Draft a Team'}
+TITLES = {'custom': 'Create a Team', 'random': 'Random Team', 'draft': 'Draft a Team', 'blacktop': 'Blacktop'}
 
 def slot_label(key):
     if key == 'bonus':
@@ -219,7 +219,15 @@ class TeamWorkspace(QWidget):
     def __init__(self, owner, kind):
         super().__init__(owner.pages)
         self.owner, self.kind = owner, kind
-        self.session = TeamSession(owner.repository.rows, kind)
+        self.is_draft = kind in ('draft', 'blacktop')
+        if kind == 'blacktop':
+            from .blacktop import BlacktopDraftSession
+            self.session = BlacktopDraftSession(owner.repository.rows)
+        else:
+            self.session = TeamSession(owner.repository.rows, kind)
+        if self.is_draft:
+            from .draft_autosave import DraftAutosave
+            self.autosave = DraftAutosave(kind)
         self.choice_dialog = None
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 8, 18, 8)
@@ -228,12 +236,18 @@ class TeamWorkspace(QWidget):
         title = QLabel(TITLES[kind]); title.setObjectName('detailName')
         heading.addWidget(title)
         heading.addStretch()
+        if self.is_draft:
+            from .draft_audio import DraftSongPlayer, DraftSongControls
+            self.draft_song = DraftSongPlayer(self)
+            heading.addWidget(DraftSongControls(self.draft_song))
+            heading.addSpacing(12)
         self.count = QLabel(); self.count.setObjectName('count'); heading.addWidget(self.count)
         root.addLayout(heading)
         descriptions = {
             'custom': 'Click a card to add it to your team. Choose up to 13 cards; duplicates are allowed.',
             'random': 'One starter at each primary position. Every available tier has an equal chance; each player appears once.',
             'draft': 'Pick a starter and backup at every position, two deep bench players, then a bonus player. Choose one card from each pack.',
+            'blacktop': 'Draft a 1v1 through 5v5 pool plus a bonus player. Inject every drafted card into the live Blacktop player pool.',
         }
         title.setToolTip(descriptions[kind])
         toolbar = QHBoxLayout()
@@ -245,18 +259,18 @@ class TeamWorkspace(QWidget):
             toolbar.addWidget(self.custom_toggle)
         else:
             self.custom_toggle.hide()
-        if kind == 'draft':
+        if self.is_draft:
             self.odds = QComboBox()
             for name in ('Baller', 'Default', 'Budget', 'Super Budget'):
                 self.odds.addItem(f'{name} Draft', name.lower().replace(' ', '_'))
-                self.odds.setItemData(self.odds.count() - 1, self.odds_tooltip(name.lower().replace(' ', '_')), Qt.ItemDataRole.ToolTipRole)
+                self.odds.setItemData(self.odds.count() - 1, self.mode_tooltip(name.lower().replace(' ', '_')), Qt.ItemDataRole.ToolTipRole)
             self.odds.setCurrentIndex(1)
             self.odds.setAccessibleName('Draft odds mode')
             self.odds.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
             self.odds.currentIndexChanged.connect(self.change_mode)
             toolbar.addWidget(self.odds)
         toolbar.addStretch()
-        self.reset_button = QPushButton('Generate another' if kind == 'random' else 'Start over' if kind == 'draft' else 'Clear team')
+        self.reset_button = QPushButton('Generate another' if kind == 'random' else 'Start over' if self.is_draft else 'Clear team')
         self.reset_button.clicked.connect(self.reset)
         toolbar.addWidget(self.reset_button)
         for title, method in [('Load lineup', self.load), ('Save lineup', self.save), ('Export PNG', self.export)]:
@@ -264,25 +278,31 @@ class TeamWorkspace(QWidget):
         self.inject_button = QPushButton('Inject team')
         self.inject_button.clicked.connect(self.open_injection)
         toolbar.addWidget(self.inject_button)
+        if kind == 'blacktop': self.inject_button.setText('Inject Blacktop team')
         root.addLayout(toolbar)
+        if kind == 'blacktop': self.create_blacktop_settings(root)
+        if self.is_draft:
+            self.autosave_note = QLabel('Drafts save automatically in local storage.')
+            self.autosave_note.setObjectName('muted'); self.autosave_note.setWordWrap(True)
+            root.addWidget(self.autosave_note)
         self.notice = QLabel(); self.notice.setWordWrap(True); self.notice.setObjectName('notice'); root.addWidget(self.notice)
-        if kind == 'draft':
+        if self.is_draft:
             self.notice.setObjectName('muted')
         self.roster_body = QWidget()
         self.roster_layout = QHBoxLayout(self.roster_body) if kind == 'custom' else QGridLayout(self.roster_body)
         self.roster_layout.setSpacing(6 if kind == 'draft' else 12)
-        if kind in ('draft', 'random'):
+        if kind in ('draft', 'blacktop', 'random'):
             self.roster_layout.setContentsMargins(0, 0, 0, 0)
             self.roster_layout.setRowStretch(0, 1)
             if kind == 'draft':
                 self.roster_layout.setRowStretch(1, 1)
         if kind != 'custom':
-            for column in range(7 if kind == 'draft' else 5):
+            for column in range(self.session.size + 1 if kind == 'blacktop' else 7 if kind == 'draft' else 5):
                 self.roster_layout.setColumnStretch(column, 1)
         self.roster_scroll = QScrollArea(self)
         self.roster_scroll.setWidgetResizable(True)
         self.roster_scroll.setWidget(self.roster_body)
-        if kind in ('draft', 'random'):
+        if kind in ('draft', 'blacktop', 'random'):
             self.roster_scroll.takeWidget()
             self.roster_scroll.hide()
             root.addWidget(self.roster_body, 1)
@@ -297,6 +317,100 @@ class TeamWorkspace(QWidget):
             except ValueError as exc:
                 self.notice.setText(str(exc))
         self.refresh()
+
+    def create_blacktop_settings(self, root):
+        from .blacktop import ROLES
+        row = QHBoxLayout()
+        row.addWidget(QLabel('Team format'))
+        self.team_size = QComboBox()
+        self.team_size.setAccessibleName('Blacktop team format')
+        for size in range(1, 6): self.team_size.addItem(f'{size}v{size}', size)
+        row.addWidget(self.team_size)
+        self.solo_controls = QWidget()
+        solo = QHBoxLayout(self.solo_controls); solo.setContentsMargins(0, 0, 0, 0)
+        solo.addWidget(QLabel('1v1 position'))
+        self.solo_group = QButtonGroup(self); self.solo_group.setExclusive(True)
+        self.solo_checks = {}
+        for index, role in enumerate(ROLES):
+            check = QCheckBox(role.title()); check.setChecked(role == 'guard')
+            self.solo_group.addButton(check, index); self.solo_checks[role] = check
+            solo.addWidget(check)
+        row.addWidget(self.solo_controls)
+        row.addStretch()
+        root.addLayout(row)
+        self.team_size.currentIndexChanged.connect(self.change_blacktop_settings)
+        self.solo_group.idClicked.connect(self.change_blacktop_settings)
+
+    def change_blacktop_settings(self, *_):
+        role = next(role for role, check in self.solo_checks.items() if check.isChecked())
+        self.session.configure(size=self.team_size.currentData(), solo_role=role)
+        self.refresh()
+
+    def blacktop_round_name(self, mode=None):
+        mode = mode or self.session.mode
+        return 'Pink Diamond / Diamond' if mode == 'baller' else bonus_round_name(mode)
+
+    def mode_tooltip(self, mode):
+        if self.kind != 'blacktop': return self.odds_tooltip(mode)
+        lines = ['<div style="font-size:14px;"><b>Blacktop odds per choice</b><table>']
+        for tier, chance in draft_odds(mode, 'starter'):
+            lines.append(f'<tr><td>{tier}</td><td>{percentage_text(chance)}</td></tr>')
+        lines.append('</table><b>' + self.blacktop_round_name(mode) + ' round:</b> ' +
+                     ' · '.join(f'{tier} {percentage_text(chance)}' for tier, chance in bonus_odds(mode)))
+        lines.append('<br>Five independent choices; players cannot repeat. Position rules apply to every choice.'
+                     '<br>5v5 slot 4: 50% Wing, 50% Big, rolled once per draft.'
+                     '<br>If a tier is unavailable, another eligible tier is used.</div>')
+        return ''.join(lines)
+
+    def save_automatically(self):
+        if not self.is_draft: return
+        try:
+            path = self.autosave.save(self.session)
+            if path:
+                self.autosave_note.setText('Auto-saved locally · ' + path.name)
+                self.autosave_note.setToolTip(str(path))
+                self.autosave_note.setStyleSheet('')
+        except OSError as exc:
+            self.autosave_note.setText('Auto-save failed: ' + str(exc) + ' · Use Save lineup to save another copy.')
+            self.autosave_note.setStyleSheet('color: #ffd080;')
+
+    def refresh_blacktop(self):
+        clear(self.roster_layout)
+        s = self.session
+        progress = bool(s.selected or s.pending)
+        self.odds.blockSignals(True); self.odds.setCurrentIndex(self.odds.findData(s.mode)); self.odds.blockSignals(False)
+        self.odds.setEnabled(not progress); self.custom_toggle.setEnabled(not s.pending)
+        self.team_size.blockSignals(True); self.team_size.setCurrentIndex(self.team_size.findData(s.size)); self.team_size.blockSignals(False)
+        self.team_size.setEnabled(not progress)
+        self.solo_controls.setVisible(s.size == 1)
+        for role, check in self.solo_checks.items():
+            check.setChecked(role == s.solo_role); check.setEnabled(not progress)
+        self.odds.setToolTip(self.mode_tooltip(s.mode))
+        self.inject_button.setEnabled(s.complete)
+        self.count.setText(f'{len(s.selected)}/{s.size + 1}')
+        self.notice.setVisible(True)
+        status = (f'Current pack: {s.slot_label(s.pending)}. Click its slot to resume.' if s.pending else
+                  f'{self.blacktop_round_name()} bonus round unlocks after {s.size} regular pick(s).' if not s.complete and 'bonus' not in s.selected and len(s.selected) < s.size else
+                  'Choose your bonus player.' if not s.complete else
+                  f'Team complete · all {s.size + 1} displayed players will inject, highest OVR over highest OVR.')
+        if s.size == 5: status = f'Slot 4 rolled {s.flex_role.title()} (50/50 Wing or Big). ' + status
+        self.notice.setText(status)
+        lineup = dict(s.lineup())
+        for col in range(7): self.roster_layout.setColumnStretch(col, 1 if col < len(s.keys) else 0)
+        for index, key in enumerate(s.keys):
+            row = lineup.get(key)
+            title = ('PD / Diamond' if s.mode == 'baller' else self.blacktop_round_name()) + ' round' if key == 'bonus' else s.slot_label(key)
+            action = (lambda checked=False, r=row: self.inspect(r)) if row else (lambda checked=False, k=key: self.open_pack(k))
+            tile = DraftRosterTile(row, title, 'View card' if row else 'Resume pack' if key == s.pending else 'Open pack', action)
+            enabled = bool(row) or (not s.pending or key == s.pending)
+            if key == 'bonus': enabled = enabled and all(k in s.selected for k in s.regular_keys)
+            tile.setEnabled(enabled)
+            self.roster_layout.addWidget(tile, 0, index)
+
+    def hideEvent(self, event):
+        if self.is_draft:
+            self.draft_song.pause()
+        super().hideEvent(event)
 
     def create_picker(self, root):
         from .desktop import CardModel, CardDelegate, Gallery
@@ -343,7 +457,10 @@ class TeamWorkspace(QWidget):
         if self.kind == 'draft' and len(lineup) != 13:
             QMessageBox.information(self, 'Inject team', 'Finish all 13 draft picks before injecting.')
             return
-        panel = InjectionPanel(self.owner, lineup)
+        if self.kind == 'blacktop' and not self.session.complete:
+            QMessageBox.information(self, 'Blacktop', 'Finish all regular picks and the bonus round before injecting.')
+            return
+        panel = InjectionPanel(self.owner, lineup, blacktop=True) if self.kind == 'blacktop' else InjectionPanel(self.owner, lineup)
         self.owner.show_overlay(panel, panel.release)
 
     def filter_cards(self):
@@ -384,6 +501,7 @@ class TeamWorkspace(QWidget):
     def change_custom(self, enabled):
         self.session.include_custom = enabled
         self.filter_cards()
+        self.save_automatically()
 
     def change_mode(self):
         self.session.mode = self.odds.currentData()
@@ -403,9 +521,12 @@ class TeamWorkspace(QWidget):
 
     def show_odds(self):
         # Retained for callers; odds are available directly on hover.
-        self.odds.setToolTip(self.odds_tooltip(self.session.mode))
+        self.odds.setToolTip(self.mode_tooltip(self.session.mode))
 
     def refresh(self):
+        if self.kind == 'blacktop':
+            self.refresh_blacktop()
+            return
         clear(self.roster_layout)
         lineup = dict(self.session.lineup())
         total = 5 if self.kind == 'random' else 13
@@ -454,6 +575,7 @@ class TeamWorkspace(QWidget):
             cards = self.session.open_pack(key)
         except ValueError as exc:
             QMessageBox.information(self, 'Draft', str(exc)); return
+        self.save_automatically()
         self.refresh()
         panel = QFrame(); self.choice_dialog = panel
         panel.setObjectName('content')
@@ -461,13 +583,24 @@ class TeamWorkspace(QWidget):
         margin = 16 if key == 'bonus' else 20
         outer.setContentsMargins(margin, margin, margin, margin)
         outer.setSpacing(8 if key == 'bonus' else 14)
+        from .draft_audio import DraftSongControls
+        song_heading = QHBoxLayout()
         if key != 'bonus':
-            eyebrow = QLabel('ON THE CLOCK'); eyebrow.setObjectName('eyebrow'); outer.addWidget(eyebrow)
-            heading = QLabel('Choose your ' + slot_label(key)); heading.setObjectName('detailName'); outer.addWidget(heading)
+            eyebrow = QLabel('ON THE CLOCK'); eyebrow.setObjectName('eyebrow'); song_heading.addWidget(eyebrow)
+        song_heading.addStretch()
+        song_heading.addWidget(DraftSongControls(self.draft_song))
+        outer.addLayout(song_heading)
+        if key != 'bonus':
+            heading = QLabel('Choose your ' + (self.session.slot_label(key) if self.kind == 'blacktop' else slot_label(key))); heading.setObjectName('detailName'); outer.addWidget(heading)
             hint = QLabel('Five independently rolled choices. Press Esc to view your team; resume this pack to return to the same players.')
             hint.setObjectName('muted'); hint.setWordWrap(True); outer.addWidget(hint)
         if key == 'bonus':
-            outer.addWidget(LineupPreview(self.session.lineup()))
+            if self.kind == 'blacktop':
+                heading = QLabel(self.blacktop_round_name() + ' round · bonus player')
+                heading.setObjectName('detailName'); outer.addWidget(heading)
+            preview = LineupPreview(self.session.lineup())
+            if self.kind == 'blacktop': preview.setMaximumHeight(150)
+            outer.addWidget(preview)
         choices = QHBoxLayout(); choices.setSpacing(14)
         for row in cards:
             choices.addWidget(DraftChoice(self, row, compact=key == 'bonus'), 1)
@@ -481,15 +614,27 @@ class TeamWorkspace(QWidget):
 
     def pick(self, cid):
         self.session.pick(cid)
+        self.save_automatically()
         if self.choice_dialog:
             self.owner.close_overlay()
+        else:
+            self.refresh()
 
     def reset(self):
         if self.kind != 'random' and (self.session.lineup() or self.session.pending):
             if QMessageBox.question(self, 'Start over', 'Clear this lineup and any pending draft choices?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                 return
         old = self.session
-        self.session = TeamSession(self.owner.repository.rows, self.kind)
+        if self.kind == 'blacktop':
+            from .blacktop import BlacktopDraftSession
+            self.session = BlacktopDraftSession(self.owner.repository.rows)
+            self.session.configure(size=old.size, solo_role=old.solo_role)
+        else:
+            self.session = TeamSession(self.owner.repository.rows, self.kind)
+        if self.is_draft:
+            from .draft_autosave import DraftAutosave
+            self.autosave = DraftAutosave(self.kind)
+            self.autosave_note.setText('Drafts save automatically in local storage.')
         self.session.mode, self.session.include_custom = old.mode, old.include_custom
         if self.kind == 'random':
             try:
@@ -499,7 +644,11 @@ class TeamWorkspace(QWidget):
         self.refresh()
 
     def directory(self):
-        path = project_root() / '.project/user/teams'
+        if self.is_draft:
+            from .draft_autosave import autosave_directory
+            path = autosave_directory(self.kind)
+        else:
+            path = project_root() / '.project/user/teams'
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -518,7 +667,9 @@ class TeamWorkspace(QWidget):
         if not path:
             return
         try:
-            loaded = TeamSession.load(self.owner.repository.rows, path)
+            from .blacktop import BlacktopDraftSession
+            loader = BlacktopDraftSession if self.kind == 'blacktop' else TeamSession
+            loaded = loader.load(self.owner.repository.rows, path)
             if loaded.kind != self.kind:
                 raise ValueError(f'Open {TITLES[loaded.kind]} to load this team.')
         except (OSError, ValueError, TypeError, KeyError) as exc:
@@ -528,7 +679,10 @@ class TeamWorkspace(QWidget):
                 return
         self.session = loaded
         self.custom_toggle.blockSignals(True); self.custom_toggle.setChecked(loaded.include_custom); self.custom_toggle.blockSignals(False)
-        if self.kind == 'draft':
+        if self.is_draft:
+            from .draft_autosave import DraftAutosave
+            self.autosave = DraftAutosave(self.kind)
+            self.save_automatically()
             self.odds.blockSignals(True); self.odds.setCurrentIndex(self.odds.findData(loaded.mode)); self.odds.blockSignals(False)
         self.filter_cards(); self.refresh()
 
@@ -548,12 +702,17 @@ class TeamWorkspace(QWidget):
         painter = QPainter(canvas)
         painter.setPen(QColor('#e8eff7')); painter.setFont(QFont('Segoe UI', 24, QFont.Weight.Bold))
         painter.drawText(QRect(25, 15, 1450, 55), Qt.AlignmentFlag.AlignLeft, 'NBA 2K17 · ' + TITLES[self.kind])
+        if self.kind == 'blacktop':
+            painter.setFont(QFont('Segoe UI', 11))
+            bonus = f'All {len(rows)} displayed players inject · highest OVR first'
+            painter.drawText(QRect(25, 68, 1450, 24), Qt.AlignmentFlag.AlignLeft,
+                             f'{self.session.size}v{self.session.size} · {self.session.mode.replace("_", " ").title()} · {bonus}')
         for index, (key, row) in enumerate(rows):
             x, y = 20 + (index % columns) * 296, 100 + (index // columns) * 480
             painter.setPen(QColor(TIER_COLORS.get(row['tier'], '#60dce5')))
             painter.drawRect(x, y, 280, 460)
             painter.setFont(QFont('Segoe UI', 12, QFont.Weight.Bold))
-            painter.drawText(QRect(x + 10, y + 4, 260, 30), Qt.AlignmentFlag.AlignLeft, slot_label(key))
+            painter.drawText(QRect(x + 10, y + 4, 260, 30), Qt.AlignmentFlag.AlignLeft, (self.session.slot_label(key) if self.kind == 'blacktop' else slot_label(key)))
             if row.get('image_path'):
                 art = QPixmap(row['image_path']).scaled(260, 355, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 painter.drawPixmap(x + (280 - art.width()) // 2, y + 36, art)

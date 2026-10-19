@@ -119,8 +119,18 @@ class CustomCardSelectionDelegate(QStyledItemDelegate):
 
 
 class ThumbnailCache:
-    def __init__(self, capacity=180):
+    def __init__(self, capacity=180, memory_limit=64 * 1024 * 1024):
         self.items, self.capacity = OrderedDict(), capacity
+        self.memory_limit = memory_limit
+        self.bytes_used = 0
+
+    @staticmethod
+    def cost(pixmap):
+        return ((pixmap.width() * pixmap.depth() + 31) // 32) * 4 * pixmap.height()
+
+    def clear(self):
+        self.items.clear()
+        self.bytes_used = 0
 
     def get(self, path, size: QSize):
         if not path:
@@ -135,9 +145,14 @@ class ThumbnailCache:
         if original.isValid():
             reader.setScaledSize(original.scaled(size, Qt.AspectRatioMode.KeepAspectRatio))
         pixmap = QPixmap.fromImage(reader.read())
+        cost = self.cost(pixmap)
+        if cost > self.memory_limit:
+            return pixmap
         self.items[cache_key] = pixmap
-        while len(self.items) > self.capacity:
-            self.items.popitem(last=False)
+        self.bytes_used += cost
+        while len(self.items) > self.capacity or self.bytes_used > self.memory_limit:
+            _, removed = self.items.popitem(last=False)
+            self.bytes_used -= self.cost(removed)
         return pixmap
 
 
@@ -555,7 +570,7 @@ class ViewerWindow(QMainWindow):
         team_bar.setContentsMargins(26, 8, 26, 8)
         team_bar.addWidget(text('TEAM MODES', 'eyebrow'))
         self.team_buttons = {}
-        for kind, title in [('custom', 'Create a Team'), ('random', 'Random Team'), ('draft', 'Draft a Team')]:
+        for kind, title in [('custom', 'Create a Team'), ('random', 'Random Team'), ('draft', 'Draft a Team'), ('blacktop', 'Blacktop')]:
             button = QPushButton(title)
             button.setEnabled(False)
             button.clicked.connect(lambda checked=False, k=kind: self.show_team(k))
@@ -565,6 +580,9 @@ class ViewerWindow(QMainWindow):
         self.custom_manager.clicked.connect(self.manage_custom_cards)
         team_bar.addWidget(self.custom_manager)
         team_bar.addStretch()
+        self.connection_button = QPushButton('Game Connection')
+        self.connection_button.clicked.connect(self.show_game_connection)
+        team_bar.addWidget(self.connection_button)
         root.addLayout(team_bar)
         root.addWidget(self.pages, 1)
         archive_page = QWidget()
@@ -680,6 +698,15 @@ class ViewerWindow(QMainWindow):
         self.overlay_escape = QShortcut(QKeySequence('Esc'), self)
         self.overlay_escape.setEnabled(False)
         self.overlay_escape.activated.connect(self.close_overlay)
+        from .injection_session import SessionManager
+        from .game_connection_ui import GameConnectionController
+        self.injection_manager = SessionManager()
+        self.game_connection = GameConnectionController(self.injection_manager, self)
+        self.connection_page = None
+        self._close_after_connection = False
+        self.game_connection.idle.connect(self._connection_idle)
+        QApplication.instance().aboutToQuit.connect(self.game_connection.shutdown)
+        QApplication.instance().aboutToQuit.connect(self.injection_manager.shutdown)
         QTimer.singleShot(0, self.load_archive)
 
     def resizeEvent(self, event):
@@ -759,15 +786,33 @@ class ViewerWindow(QMainWindow):
         self.pages.setCurrentWidget(self.team_workspaces[kind])
         self.search.hide()
 
+    def show_game_connection(self):
+        from .game_connection_ui import GameConnectionPage
+        if self.connection_page is None:
+            self.connection_page = GameConnectionPage(self.game_connection)
+            self.pages.addWidget(self.connection_page)
+        self.pages.setCurrentWidget(self.connection_page)
+        self.search.hide()
+        self.game_connection.refresh(force=True)
+
+    def _connection_idle(self):
+        if self._close_after_connection:
+            QTimer.singleShot(0, self.close)
+
     def closeEvent(self, event):
         manager = getattr(self, 'injection_manager', None)
-        if manager is not None and manager.busy:
+        connection = getattr(self, 'game_connection', None)
+        if manager is not None and manager.busy and not (connection and connection.active):
             event.ignore()
             return
         if any(getattr(panel, 'busy', False) for panel, _, _ in self.overlay_history):
             event.ignore()
             return
         if self.studio is not None and not self.studio.close():
+            event.ignore()
+            return
+        if connection is not None and not connection.shutdown():
+            self._close_after_connection = True
             event.ignore()
             return
         if manager is not None: manager.shutdown()
@@ -927,8 +972,11 @@ class ViewerWindow(QMainWindow):
         done.clicked.connect(dialog.accept)
         actions.addWidget(done)
         layout.addLayout(actions)
-        populate()
-        dialog.exec()
+        try:
+            populate()
+            dialog.exec()
+        finally:
+            dialog.deleteLater()
         if changed[0]:
             self.load_archive()
 
@@ -980,14 +1028,20 @@ class ViewerWindow(QMainWindow):
             button.setEnabled(True)
         for workspace in self.team_workspaces.values():
             from .teams import TeamSession
+            from .blacktop import BlacktopDraftSession
+            session_type = BlacktopDraftSession if workspace.kind == 'blacktop' else TeamSession
             try:
-                workspace.session = TeamSession.from_data(repository.rows, workspace.session.data())
+                workspace.session = session_type.from_data(repository.rows, workspace.session.data())
             except ValueError:
                 QMessageBox.information(self, 'Team archive changed', 'A team references cards unavailable in this archive. Its workspace has been reset; saved lineup files are unchanged.')
-                workspace.session = TeamSession(repository.rows, workspace.kind)
+                workspace.session = session_type(repository.rows) if workspace.kind == 'blacktop' else session_type(repository.rows, workspace.kind)
+                if workspace.is_draft:
+                    from .draft_autosave import DraftAutosave
+                    workspace.autosave = DraftAutosave(workspace.kind)
+                    workspace.autosave_note.setText('Drafts save automatically in local storage.')
             workspace.filter_cards()
             workspace.refresh()
-        self.cache.items.clear()
+        self.cache.clear()
         facets = repository.facets()
         for key, options in facets.items():
             combo = self.filters[key]
@@ -1075,6 +1129,18 @@ def main(argv=None):
         assert all(t['defaults']['gameplay_metadata']['speech_id'] == source_value(t) for t in speech_templates)
         result['source_speech_cards'] = len(speech_templates)
         result['speech_field_width'] = 2
+        from .game_hook import (hook_payload_dir, PAYLOAD_HASHES, file_sha256, HOOK_OPTIONS,
+                                materialize_install_payload, HOOK_INSTALL_SHA256, HOOK_PROFILE)
+        payload = hook_payload_dir()
+        assert payload is not None, 'Bundled game hook resources are missing.'
+        assert all(file_sha256(payload / name) == digest for name, digest in PAYLOAD_HASHES.items())
+        import hashlib
+        install_dll = materialize_install_payload('NBA2K_Hook.dll', (payload / 'NBA2K_Hook.dll').read_bytes())
+        assert hashlib.sha256(install_dll).hexdigest() == HOOK_INSTALL_SHA256
+        result['hook_payload_verified'] = True
+        result['hook_compatibility_profile'] = HOOK_PROFILE
+        result['hook_install_sha256'] = HOOK_INSTALL_SHA256
+        result['hook_setting_count'] = len(HOOK_OPTIONS)
         if args.report:
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(json.dumps(result, indent=2), encoding='utf-8')
@@ -1089,6 +1155,8 @@ def main(argv=None):
     app.setWindowIcon(app_icon())
     app.setStyle('Fusion')
     app.setStyleSheet(STYLE)
+    if args.ui_smoke_test:
+        os.environ['NBA2K17_DISABLE_GAME_MONITOR'] = '1'
     window = ViewerWindow(path)
     if args.ui_smoke_test:
         def verify_ui():
@@ -1179,6 +1247,7 @@ def main(argv=None):
                     window.grab().save(str(args.report.parent / 'integrated-studio.png'))
                     studio.saved = studio.doc.clone()
                     window.archive_button.click()
+                    assert list(window.team_buttons) == ['custom', 'random', 'draft', 'blacktop']
                     for kind in ('custom', 'random', 'draft'):
                         window.team_buttons[kind].click()
                         app.processEvents()
@@ -1190,8 +1259,30 @@ def main(argv=None):
                             assert len(workspace.session.lineup()) == 5
                         else:
                             from .teams import DRAFT_KEYS
+                            from .draft_audio import DraftSongControls
+                            from PySide6.QtMultimedia import QAudioBufferOutput
+                            from time import monotonic, sleep
+                            song = workspace.draft_song
+                            assert song.player is None  # No automatic playback.
+                            assert len(workspace.findChildren(DraftSongControls)) == 1
+                            song.set_volume(0)  # Keep executable QA silent.
+                            assert song.ensure_player()
+                            audio_buffers = QAudioBufferOutput(song)
+                            decoded_audio = []
+                            audio_buffers.audioBufferReceived.connect(lambda buffer: decoded_audio.append(buffer.byteCount()))
+                            song.player.setAudioBufferOutput(audio_buffers)
+                            song.toggle()
+                            deadline = monotonic() + 15
+                            while not any(decoded_audio) and not song.error and monotonic() < deadline:
+                                app.processEvents(); sleep(.01)
+                            assert any(decoded_audio) and not song.error, song.error or 'Draft audio did not decode'
+                            song.pause(); song.player.setPosition(0)
+                            song.player.setAudioBufferOutput(None)
+                            audio_buffers.deleteLater()
+                            song.set_volume(30)
                             workspace.open_pack('starter|PG')
                             app.processEvents()
+                            assert workspace.choice_dialog.findChild(DraftSongControls).song is song
                             saved_options = list(workspace.session.options)
                             assert not workspace.choice_dialog.isWindow()
                             assert workspace.choice_dialog.width() > window.width() * .9
@@ -1205,6 +1296,7 @@ def main(argv=None):
                                 workspace.session.pick(str(pack[0]['source_card_id']))
                             workspace.open_pack('bonus')
                             app.processEvents()
+                            assert workspace.choice_dialog.findChild(DraftSongControls).song is song
                             from .team_ui import LineupPreview
                             assert len(workspace.choice_dialog.findChild(LineupPreview).rows) == 12
                             window.grab().save(str(args.report.parent / 'diamond-round-preview.png'))
@@ -1222,18 +1314,69 @@ def main(argv=None):
                         assert panel.browse.isEnabled() and panel.find_button.isEnabled()
                         window.grab().save(str(args.report.parent / f'{kind}-injection.png'))
                         window.close_overlay()
+                        assert not hasattr(workspace, 'blacktop_button')
                         window.studio_button.click()
                         assert window.pages.currentWidget() is studio
                         window.archive_button.click()
                         assert window.pages.currentWidget() is window.archive_page
-                    args.report.write_text(json.dumps({'ui_ready': True, 'cards': window.model.rowCount(), 'tabs': 5, 'team_modes': 3, 'injection_panels': 3, 'full_draft_verified': True, 'native_studio_overall': True, 'database_rebuilt': False}), encoding='utf-8')
+                    from .blacktop import BlacktopDraftSession
+                    from .teams import DRAFT_MODES
+                    import random
+                    blacktop_variants = 0
+                    for mode in DRAFT_MODES:
+                        for size, solo_role in [(1, 'guard'), (1, 'wing'), (1, 'big'), (2, 'guard'), (3, 'guard'), (4, 'guard'), (5, 'guard')]:
+                            example = BlacktopDraftSession(window.repository.rows, random.Random(2017 + size))
+                            example.mode = mode; example.configure(size=size, solo_role=solo_role)
+                            for key in example.keys:
+                                pack = example.open_pack(key)
+                                assert len(pack) == 5 and all(example.eligible(row, key) for row in pack)
+                                example.pick(str(pack[0]['source_card_id']))
+                            assert example.complete and len(example.active_lineup()) == size + 1
+                            restored = BlacktopDraftSession.from_data(window.repository.rows, example.data())
+                            assert restored.data() == example.data()
+                            blacktop_variants += 1
+                    window.team_buttons['blacktop'].click(); app.processEvents()
+                    workspace = window.team_workspaces['blacktop']
+                    window.grab().save(str(args.report.parent / 'blacktop-1v1-settings.png'))
+                    workspace.team_size.setCurrentIndex(workspace.team_size.findData(5))
+                    for key in workspace.session.regular_keys:
+                        workspace.open_pack(key); app.processEvents()
+                        if key == workspace.session.regular_keys[0]:
+                            window.grab().save(str(args.report.parent / 'blacktop-choices.png'))
+                        workspace.pick(workspace.session.options[0])
+                    workspace.open_pack('bonus'); app.processEvents()
+                    window.grab().save(str(args.report.parent / 'blacktop-bonus.png'))
+                    workspace.pick(workspace.session.options[0])
+                    assert not hasattr(workspace, 'bonus_choice') and workspace.session.complete
+                    assert workspace.autosave.path.is_file()
+                    saved = BlacktopDraftSession.load(window.repository.rows, workspace.autosave.path)
+                    assert saved.data() == workspace.session.data()
+                    workspace.refresh(); app.processEvents()
+                    workspace.export_image(args.report.parent / 'blacktop-team-export.png')
+                    window.grab().save(str(args.report.parent / 'blacktop-team.png'))
+                    workspace.inject_button.click(); app.processEvents()
+                    panel = window.overlay_pages.currentWidget()
+                    assert panel.blacktop and panel.scan_button.isEnabled()
+                    assert len(panel.profiles) == 6 and not panel.roster.isEnabled()
+                    from .roster_injection import ranked_profiles
+                    expected_profiles = ranked_profiles([window.repository.cards[row['id']]['injection'] for _, row in workspace.session.lineup()])
+                    assert [p['source_card_identity'] for p in panel.profiles] == [p['source_card_identity'] for p in expected_profiles]
+                    window.grab().save(str(args.report.parent / 'blacktop-injection.png'))
+                    window.close_overlay()
+                    window.game_connection.shutdown()
+                    window.connection_button.click()
+                    app.processEvents()
+                    assert window.pages.currentWidget() is window.connection_page
+                    assert len(window.connection_page.options) == 6
+                    window.grab().save(str(args.report.parent / 'game-connection.png'))
+                    args.report.write_text(json.dumps({'ui_ready': True, 'cards': window.model.rowCount(), 'tabs': 5, 'team_modes': 4, 'injection_panels': 4, 'blacktop_panels': 1, 'blacktop_variants': blacktop_variants, 'draft_autosave': True, 'full_draft_verified': True, 'native_studio_overall': True, 'game_connection': True, 'database_rebuilt': False}), encoding='utf-8')
                 app.exit(0)
             except Exception:
                 if args.report:
                     args.report.write_text(json.dumps({'ui_ready': False, 'error': traceback.format_exc()}), encoding='utf-8')
                 app.exit(1)
         window.loaded.connect(verify_ui)
-        QTimer.singleShot(30000, lambda: app.exit(2))
+        QTimer.singleShot(90000, lambda: app.exit(2))
     window.show()
     return app.exec()
 

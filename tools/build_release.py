@@ -1,5 +1,6 @@
 """Build the Windows application using the matching published resource bundle."""
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -16,12 +17,22 @@ def main():
         if not (resources / path).is_file():
             raise FileNotFoundError(f'Missing build resource: {path}')
     tools, scanner = root / 'source/tools', root / 'source/src'
+    sys.path.insert(0, str(tools))
+    from nba2k17_viewer.game_hook import PAYLOAD_HASHES
+    hook_resources = resources / 'game_hook'
+    for name, expected in PAYLOAD_HASHES.items():
+        path = hook_resources / name
+        if not path.resolve().is_relative_to(hook_resources.resolve()) or not path.is_file():
+            raise FileNotFoundError(f'Missing hook build resource: game_hook/{name}')
+        if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            raise ValueError(f'Hook build resource differs from the reviewed package: game_hook/{name}')
     command = [sys.executable, '-m', 'PyInstaller', '--clean', '--noconfirm', '--onefile', '--windowed',
                '--name', '2K17 MyTEAM', '--paths', str(tools), '--paths', str(scanner),
                '--icon', str(tools / 'nba2k17_viewer/assets/myteam17.ico'),
                '--distpath', str(root / 'dist'), '--workpath', str(root / 'build'), '--specpath', str(root / 'build')]
     for source, target in [(resources / 'studio_assets', 'studio_assets'),
                            (resources / 'studio_resources', 'studio_resources'),
+                           (hook_resources, 'game_hook'),
                            (tools / 'nba2k17_viewer/assets', 'nba2k17_viewer/assets'),
                            (tools / 'nba2k17_catalog/jersey_numbers.json', 'nba2k17_catalog')]:
         command.extend(['--add-data', str(source) + os.pathsep + target])

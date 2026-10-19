@@ -53,7 +53,7 @@ class BodyOwnershipCache:
             return Region('body-alias:' + hex(address), address, raw)
         return None
 
-    def context_regions(self, records):
+    def context_regions(self, records, targets=None):
         regions = []
         for rva in SELECTED_RECORD_POINTER_RVAS:
             address = self.module_base + rva
@@ -68,7 +68,14 @@ class BodyOwnershipCache:
                 body = struct.unpack_from('<Q', record, 0x88)[0]
                 if not any(identity(record) == identity(value) and value[0x88:0x90] == record[0x88:0x90]
                            for value in records.values()):
-                    raise ValueError('The selected editor buffer is not tied to a scanned roster player')
+                    if targets is None or not body or body in targets:
+                        raise ValueError('The selected editor buffer is not tied to a scanned roster player')
+                    # An old editor selection can outlive Roster Creator. It
+                    # is unrelated only while its complete snapshot, root and
+                    # allocation remain unchanged and its body is not a target.
+                    # Never classify it as an owned alias or write into it.
+                    regions.append(Region('owner-context:' + hex(pointer), pointer, record))
+                    continue
                 if not body:
                     raise ValueError('The selected editor buffer has no body pointer')
                 regions.append(Region('owner-copy:' + hex(pointer), pointer, record))
@@ -85,7 +92,7 @@ class BodyOwnershipCache:
             self.entries[body] = {'error': 'Ownership discovery did not finish'}
         coverage = []
         try:
-            roots = self.context_regions(records)
+            roots = self.context_regions(records, targets)
             self.progress('Slow ownership discovery: scanning the entire readable process for unresolved selected bodies...')
             kwargs = {'cancel_event': cancel_event} if cancel_event is not None else {}
             references, coverage = scan_references(self.reader, {b for b in targets if b}, self.progress, **kwargs)
@@ -175,7 +182,9 @@ class BodyOwnershipCache:
                 for region in entry['watched']:
                     new = actual[region.name]
                     if new != region.before:
-                        if region.name.startswith('body-alias:'):
+                        if region.name.startswith('owner-context:'):
+                            raise ValueError('Unrelated editor context changed; ownership must be rediscovered')
+                        elif region.name.startswith('body-alias:'):
                             raise ValueError('Verified auxiliary body reference changed')
                         elif region.name.startswith('ownership-root:'):
                             pointer = struct.unpack('<Q', new)[0]

@@ -127,6 +127,34 @@ def test_missing_entry_blocks_height_instead_of_skipping_or_scanning(cache):
     assert reader.exhaustive_calls == 1
 
 
+@pytest.mark.parametrize('change', ['none', 'name', 'body', 'allocation', 'root'])
+def test_unrelated_stale_editor_is_watched_but_never_treated_as_owner(cache, change):
+    cache, reader = cache
+    stale = 0x60000
+    reader.data[stale] = record('OldRoster', 0x99000, 999)
+    reader.data[SELECTED_RECORD_POINTER_RVAS[0]] = struct.pack('<Q', stale)
+    cache.discover(reader.records, {0x80000})
+    regions = cache.require(0x80000, 0x10000)
+    assert any(r.name == 'owner-context:0x60000' for r in regions)
+    if change == 'none': return
+    if change == 'allocation': reader.allocations[stale] = 1
+    elif change == 'root': reader.data[SELECTED_RECORD_POINTER_RVAS[0]] = struct.pack('<Q', 0x40000)
+    else:
+        edited=bytearray(reader.data[stale])
+        edited[0 if change == 'name' else 0x88] ^= 1
+        reader.data[stale]=bytes(edited)
+    with pytest.raises(ValueError):cache.require(0x80000, 0x10000)
+
+
+def test_unverified_editor_sharing_target_body_still_blocks_discovery(cache):
+    cache, reader = cache
+    reader.data[0x60000] = record('Unknown', 0x80000, 999)
+    reader.data[SELECTED_RECORD_POINTER_RVAS[0]] = struct.pack('<Q', 0x60000)
+    cache.discover(reader.records, {0x80000})
+    with pytest.raises(ValueError, match='not tied to a scanned roster player'):
+        cache.require(0x80000, 0x10000)
+
+
 @pytest.mark.parametrize('base', [0, 0x140000000])
 def test_controlled_auxiliary_alias_rebases_exactly_and_is_watched(monkeypatch, base):
     reader = Reader()

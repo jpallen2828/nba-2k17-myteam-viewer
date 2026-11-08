@@ -194,7 +194,8 @@ def test_missing_loader_guides_setup_without_claiming_running_attachment(control
     assert 'close NBA 2K17' in page.setup_guidance.text()
     assert not page.install_button.isEnabled()
     assert 'read only' in page.auto.text()
-    assert 'does not attach' in page.connection_help.text()
+    assert 'mod-file hook loads when NBA 2K17 starts' in page.connection_help.text()
+    assert 'Full-name presentation below connects while MyTEAM is open' in page.connection_help.text()
     page.close()
 
 

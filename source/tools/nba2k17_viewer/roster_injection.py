@@ -55,7 +55,7 @@ def injection_workspace():
 
 def _name(raw):
     from scanner.roster_record import utf16_fixed_field
-    first = utf16_fixed_field(raw, 0x24, 0x28)
+    first = utf16_fixed_field(raw, 0x24, 0x24)
     last = utf16_fixed_field(raw, 0, 0x24)
     name = (first + ' ' + last).strip()
     return name or 'Unnamed slot'
@@ -152,6 +152,10 @@ def compile_stored_card(profile, destination, registry):
                 raise ValueError('Missing or invalid captured source ' + key)
             defaults.setdefault('gameplay_metadata', {})[key] = value
     resolved = resolve_player_values(profile, defaults, preserve_durability=True)
+    from .sculpted_appearance import profile_appearance
+    native_appearance = profile_appearance(profile, resolved, registry)
+    if native_appearance:
+        resolved['values'].setdefault('gameplay_metadata', {})['skin_type'] = native_appearance['skin_type']
     from .shoe_transfer import resolve_shoes
     resolve_shoes(resolved['values'], require_accessories=True, source_template=stored)
     # User-authorized commentary experiment: transfer the exact source identity,
@@ -181,6 +185,39 @@ def compile_stored_card(profile, destination, registry):
     # card name. A corrupted page title keeps the roster's exact spelling.
     if full == 'Ron Artest' and template_name == 'Metta World Peace':
         identity['first_name'], identity['last_name'] = 'Ron', 'Artest'
+    name_presentation = None
+    shai_name = 'Shai Gilgeous-Alexander'
+    shai_key = player_key(shai_name)
+    card_name = profile.get('source_card_identity', {}).get('name')
+    if (player_key(full or template_name) == shai_key
+            and (not card_name or player_key(card_name) == shai_key)):
+        # The native surname array holds seventeen UTF-16 units plus its NUL.
+        # Keep the complete authored name; only the transient injection plan
+        # uses the compact surname recognized by the companion name hook.
+        for key, value in (('first_name', 'Shai'), ('last_name', 'GilgeousAlexander')):
+            authored_value = identity.get(key)
+            identity[key] = value
+            resolved['origins']['identity.' + key] = {
+                'layer': 'explicit_policy', 'policy': 'SHAI_COMPACT_NATIVE_NAME',
+                'authored_value': authored_value, 'storage_value': value}
+        face_id = resolved['values'].get('gameplay_metadata', {}).get('face_id')
+        name_presentation = {
+            'policy': 'SHAI_COMPACT_NATIVE_NAME', 'authored_name': shai_name,
+            'native_first_name': 'Shai', 'native_last_name': 'GilgeousAlexander',
+            'native_full_name': 'Shai GilgeousAlexander',
+            'requires_companion_hook': True, 'hook_face_id': 7710,
+            'injected_face_id': face_id, 'hook_face_id_matches': face_id == 7710,
+            'presentation_verified': False,
+            'description': 'Native storage uses Shai GilgeousAlexander. The full hyphenated '
+                           'menu name and jersey surname require the active companion name hook '
+                           'and face ID 7710. Memory readback does not verify on-screen presentation.'}
+    if 'last_name' in identity:
+        # Native GetLastName resolves +0x48 before consulting the inline name.
+        # Clear that selector deliberately as its own previewed/undoable field;
+        # a first-name write must never touch it through an oversized buffer.
+        identity['localized_last_name_crc'] = 0
+        resolved['origins']['identity.localized_last_name_crc'] = {
+            'layer': 'explicit_policy', 'policy': 'INLINE_SURNAME_DISPLAYS_SAVED_CARD_NAME'}
     definitions = {f['field']: f for f in registry['fields']}
     # Every card-owned rating/zone is required; absent is never destination data.
     for section in ('attributes', 'tendencies', 'hot_zones'):
@@ -198,6 +235,9 @@ def compile_stored_card(profile, destination, registry):
     preview['badge_policy'] = badges
     preview['template_id'] = stored['template_id']
     preview['capture_sha256'] = stored['capture_sha256']
+    preview['native_sculpt_appearance'] = native_appearance
+    if name_presentation:
+        preview['name_presentation'] = name_presentation
     return preview
 
 
@@ -420,6 +460,12 @@ class RosterSession:
         self.body_cache = BodyOwnershipCache(self.reader, self.module_base, self.progress,
             auxiliary_references=self.registry.get('body_auxiliary_references', ()))
         self.body_cache.records = self.records
+        from .sculpt_ownership import SculptOwnershipCache
+        self.sculpt_cache = SculptOwnershipCache(self.reader, self.module_base, self.progress)
+        self.sculpt_cache.records = self.records
+        self.appearance_cache = SculptOwnershipCache(self.reader, self.module_base, self.progress,
+                                                    pointer_offset=0x88, block_size=132)
+        self.appearance_cache.records = self.records
         # Linked values are read only for selected destinations during preflight.
         # An unreadable body on an unrelated team must not block attachment.
         self.body_values = {}
@@ -451,10 +497,13 @@ class RosterSession:
         if team is None:
             raise ValueError('Select a scanned NBA team before diagnosing ownership.')
         bodies = {struct.unpack_from('<Q', self.records[s['player']], 0x88)[0] for s in team['slots']}
+        sculpts, appearances = set(), set()
         if profiles is not None:
             check = self.preflight(profiles, team_key, slots=slots)
             if check['blockers']: raise ValueError('\n'.join(check['blockers']))
             bodies = set(check['missing_bodies'])
+            sculpts = set(check.get('missing_sculpts', ()))
+            appearances = set(check.get('missing_appearances', ()))
         self.body_cache.progress = self.progress
         with self.metrics.stage('diagnostic_ownership_discovery'):
             summary = self.body_cache.discover(self.records, bodies, cancel_event=self.cancel_event) if bodies else self.body_cache.summary()
@@ -465,6 +514,15 @@ class RosterSession:
                     self.progress('Player selection changed during the scan; repeating ownership verification automatically once...')
                     summary=self.body_cache.discover(self.records,bodies,cancel_event=self.cancel_event)
                     self.body_cache.last_discovery['automatic_context_retry']=True
+        if sculpts or appearances:
+            from scanner.pointer_index import scan_references
+            discovered = scan_references(self.reader, sculpts | appearances, self.progress,
+                                         cancel_event=self.cancel_event)
+            for cache, targets in ((self.sculpt_cache, sculpts), (self.appearance_cache, appearances)):
+                if targets:
+                    cache.progress = self.progress
+                    cache.discover(self.records, targets, cancel_event=self.cancel_event,
+                                   discovery_result=discovered)
         self._check_regions(self.regions)
         self.validate()
         path = injection_workspace() / ('ownership-diagnostic-' + uuid.uuid4().hex + '.json')
@@ -474,6 +532,8 @@ class RosterSession:
                   'validated_bodies': sum('error' not in self.body_cache.entries.get(b, {'error': 'missing'}) for b in bodies),
                   'blocked_bodies': sum('error' in self.body_cache.entries.get(b, {'error': 'missing'}) for b in bodies),
                   'requested_bodies': len(bodies), 'bodies': [self.body_cache.describe(b) for b in sorted(bodies)],
+                  'sculpts': [self.sculpt_cache.describe(p) for p in sorted(sculpts)],
+                  'appearances': [self.appearance_cache.describe(p) for p in sorted(appearances)],
                   'performance': self.metrics.report(), 'memory_written': False, 'report_path': str(path)}
         path.write_text(json.dumps(report, indent=2), encoding='utf-8')
         return report
@@ -517,7 +577,7 @@ class RosterSession:
         return result
 
     @staticmethod
-    def desired_body(profile, plan):
+    def desired_body(profile, plan, before=None):
         stored = profile['reusable_roster_template']['defaults']
         identity = plan['resolved']['values'].get('identity', {})
         height = identity.get('height_cm', stored.get('identity', {}).get('height_cm'))
@@ -529,7 +589,18 @@ class RosterSession:
         wingspan = stored.get('appearance', {}).get('wingspan_cm')
         if height is None or wingspan is None or not 120 <= height <= 260 or not 120 <= wingspan <= 300:
             raise ValueError('Missing or invalid captured height/wingspan.')
-        return struct.pack('<ff', height, wingspan)
+        measurements = struct.pack('<ff', height, wingspan)
+        source = plan.get('native_sculpt_appearance')
+        if not source:
+            return measurements
+        desired = bytearray(measurements + bytes.fromhex(source['body_hex'])[8:])
+        # Native reflection defines only bits 0..29 of the final packed word.
+        # Its initializer preserves the two remaining bits; so do we.
+        if before is not None:
+            if len(before) != 132:
+                raise ValueError('Invalid destination appearance extent')
+            desired[131] = (desired[131] & 0x3f) | (before[131] & 0xc0)
+        return bytes(desired)
 
     def preflight(self, profiles, team_key, *, slots=None, live=True):
         """Collect all selected-lineup blockers; never scan process memory."""
@@ -538,7 +609,7 @@ class RosterSession:
         if live:
             self.validate()
             self.refresh_mutable_records()
-        blockers, missing, reasons = [], [], []
+        blockers, missing, reasons, missing_sculpts, missing_appearances = [], [], [], [], []
         if getattr(self, 'blacktop_binding', None) and team_key != self.blacktop_binding['team_key']:
             return {'blockers': ['Destination differs from the detected Blacktop team.'], 'missing_bodies': [],
                     'message': 'Scan the selected Blacktop team again.'}
@@ -563,27 +634,42 @@ class RosterSession:
                 blockers.append(label + ': destination is shared with another protected team.')
             try:
                 plan = self._compile(profile, self.records[ptr])
+                source = plan.get('native_sculpt_appearance')
+                if source:
+                    sculpt = struct.unpack_from('<Q', self.records[ptr], 0x80)[0]
+                    if not live:
+                        unchecked += 1
+                    elif self.reader.read_or_raise(sculpt, 456).hex() != source['sculpt_hex']:
+                        try: self.sculpt_cache.require(sculpt, ptr)
+                        except ValueError as exc: missing_sculpts.append(sculpt); reasons.append(label + ': ' + str(exc))
                 desired = self.desired_body(profile, plan)
                 body = struct.unpack_from('<Q', self.records[ptr], 0x88)[0]
                 if not live and body not in self.body_values:
                     unchecked += 1
                     continue
-                before = self.reader.read_or_raise(body, 8) if live else self.body_values.get(body)
+                before = self.reader.read_or_raise(body, len(desired)) if live else self.body_values.get(body)
                 if live: self.body_values[body] = before
+                if before is not None and len(before) == len(desired):
+                    desired = self.desired_body(profile, plan, before)
                 if before != desired:
                     if self.body_owner_index[body] != [ptr]: raise ValueError('Destination body storage is shared.')
                     changed += 1
+                    cache = self.appearance_cache if source else self.body_cache
+                    missing_group = missing_appearances if source else missing
                     if live:
-                        try: self.body_cache.require(body, ptr)
-                        except ValueError as exc: missing.append(body); reasons.append(label + ': ' + str(exc))
-                    elif 'owner' not in self.body_cache.entries.get(body, {}):
-                        missing.append(body); reasons.append(label + ': ownership evidence missing or stale.')
+                        try: cache.require(body, ptr)
+                        except ValueError as exc: missing_group.append(body); reasons.append(label + ': ' + str(exc))
+                    elif 'owner' not in cache.entries.get(body, {}):
+                        missing_group.append(body); reasons.append(label + ': ownership evidence missing or stale.')
             except (ValueError, OSError, KeyError) as exc: blockers.append(label + ': ' + str(exc))
         message = '\n'.join(blockers + reasons)
         if missing: message += f'\nSelected lineup: {len(set(missing))}/{changed} changed bodies need ownership checks; Inject runs these automatically (may take tens of seconds).'
+        if missing_sculpts: message += f'\n{len(set(missing_sculpts))} facial sculpt blocks need ownership checks; Inject runs these automatically.'
+        if missing_appearances: message += f'\n{len(set(missing_appearances))} full appearance blocks need ownership checks; Inject runs these automatically.'
         if unchecked: message += f'\nSession reusable. Preview transfer to check {unchecked} selected height/wingspan blocks; this quick check does not search process memory.'
         if not message: message = 'Ready to inject: live lineup checks passed.' if live else 'Session reusable. Preview or Inject performs fresh live checks for this lineup.'
-        return {'blockers': blockers, 'missing_bodies': sorted(set(missing)), 'ownership_reasons': reasons,
+        return {'blockers': blockers, 'missing_bodies': sorted(set(missing)), 'missing_sculpts': sorted(set(missing_sculpts)), 'ownership_reasons': reasons,
+                'missing_appearances': sorted(set(missing_appearances)),
                 'changed_bodies': changed, 'unchecked_bodies': unchecked, 'message': message.strip()}
 
     def automatic_slots(self, profiles, team):
@@ -626,7 +712,8 @@ class RosterSession:
         if len({s['player'] for s in destination}) != len(destination):
             raise ValueError('Multiple destinations refer to the same player record.')
         check = self.preflight(profiles, team_key, slots=[s['slot'] for s in destination])
-        if check['blockers'] or check['missing_bodies']: raise ValueError(check['message'])
+        if check['blockers'] or check['missing_bodies'] or check.get('missing_sculpts') or check.get('missing_appearances'):
+            raise ValueError(check['message'])
         self.progress('Preparing card fields and checking destination ownership...')
         self.patches, self.plans = [], []
         self.extra_regions = []
@@ -672,8 +759,17 @@ class RosterSession:
                     'requested':origin})
             self.plans.append(plan)
         self._prepare_bodies(profiles, evidence_hash)
+        self._prepare_sculpts(evidence_hash)
         # De-duplicate shared immutable label probes; reject overlapping storage.
-        regions = {r.name: r for r in self.regions + self.extra_regions}
+        spans = {}
+        for region in self.regions + self.extra_regions:
+            key = (region.address, len(region.before))
+            previous = spans.get(key)
+            if previous and previous.before != region.before:
+                raise ValueError('Shared ownership probes changed during preparation')
+            if previous is None:
+                spans[key] = region
+        regions = {r.name: r for r in spans.values()}
         self.transaction_regions = tuple(regions.values())
         self.patches = tuple(self.patches)
         self._check_regions(self.transaction_regions)
@@ -686,7 +782,7 @@ class RosterSession:
             'players': self.plans, 'all_team_tables': len(self.teams), 'watched_player_records': len(self.records),
             'complete_card_supported': False, 'remaining_limits': [
                 'Shoes and accessories use native mappings; appearance still requires in-game validation.',
-                'Remaining custom sculpt/body extent is unresolved.',
+                'Captured native sculpt sources transfer their full sculpt and appearance; other custom sculpt sources remain unmapped.',
                 'Game recalculation and save/reload are reported separately from byte readback.'],
             'policy': 'Replace occupied slots; preserve team/rotation references, destination structure, age and durability; All-Star isolation deferred.'}
         preserved_origins = [p['card_identity'].get('name','Card') for p in self.plans
@@ -695,11 +791,17 @@ class RosterSession:
             self.prepared_report['remaining_limits'].append('Origin label unavailable; existing destination origin retained for: ' + ', '.join(preserved_origins) + '.')
         if any(p['requires_mod_assets'] for p in self.plans):
             self.prepared_report['remaining_limits'].append('This lineup includes mod-roster templates; their required appearance assets have not been verified in this game installation.')
+        if any(p.get('name_presentation') for p in self.plans):
+            self.prepared_report['remaining_limits'].append(
+                'Shai uses safely terminated native name storage. Keep Full-name presentation enabled in Game Connection and MyTEAM open for the hyphenated menu and jersey name.')
+        if any(p.get('name_presentation', {}).get('hook_face_id_matches') is False for p in self.plans):
+            self.prepared_report['remaining_limits'].append(
+                'A Shai card uses a different face ID from the verified name companion profile; full-name menu presentation is not verified for that card.')
         return self.prepared_report
 
     @measured('ownership')
     def _prepare_bodies(self, profiles, evidence_hash):
-        """Validate every direct reference before writing the verified 8-byte extent."""
+        """Write measurements, or the verified native appearance extent when saved."""
         from scanner.injection_transaction import Region, Patch
         bodies = {}
         for profile, plan in zip(profiles, self.plans):
@@ -708,13 +810,15 @@ class RosterSession:
             owners = self.body_owner_index[body]
             if owners != [ptr] or body in bodies:
                 desired=self.desired_body(profile,plan)
-                if self.reader.read_or_raise(body,8)!=desired:
+                before = self.reader.read_or_raise(body, len(desired))
+                desired = self.desired_body(profile, plan, before)
+                if before!=desired:
                     raise ValueError('Destination body storage is shared: ' + plan['destination']['name'])
                 if body in bodies:
-                    if self.desired_body(bodies[body][1],bodies[body][2])!=desired:
+                    if self.desired_body(bodies[body][1],bodies[body][2],before)!=desired:
                         raise ValueError('Conflicting requested values for shared body storage')
                     plan['body']={'height_cm':struct.unpack('<f',desired[:4])[0],
-                        'wingspan_cm':struct.unpack('<f',desired[4:])[0],
+                        'wingspan_cm':struct.unpack('<f',desired[4:8])[0],
                         'region':'body:'+hex(body),'address':body,'after_hex':desired.hex()}
                     plan['unsupported']=[g for g in plan['unsupported'] if g['field'] not in ('identity.height','identity.height_cm')]
                     continue
@@ -735,26 +839,52 @@ class RosterSession:
             wingspan = stored.get('appearance', {}).get('wingspan_cm')
             if height is None or wingspan is None or not 120 <= height <= 260 or not 120 <= wingspan <= 300:
                 raise ValueError('Missing or invalid captured height/wingspan.')
-            before = self.reader.read_or_raise(body, 8)
-            after = struct.pack('<ff', height, wingspan)
+            after = self.desired_body(profile, plan)
+            before = self.reader.read_or_raise(body, len(after))
+            after = self.desired_body(profile, plan, before)
             key = 'body:' + hex(body)
             self.extra_regions.append(Region(key, body, before))
             if before != after:
-                self.patches.append(Patch(key, 0, before, after, 'identity.height_cm,appearance.wingspan_cm', evidence_hash))
+                fields = 'identity.height_cm,appearance.wingspan_cm' + (',appearance.native_body' if len(after) == 132 else '')
+                self.patches.append(Patch(key, 0, before, after, fields, evidence_hash))
                 changed_bodies[body] = (ptr, plan)
-            plan['body'] = {'height_cm': struct.unpack('<f', after[:4])[0], 'wingspan_cm': struct.unpack('<f', after[4:])[0],
+            plan['body'] = {'height_cm': struct.unpack('<f', after[:4])[0], 'wingspan_cm': struct.unpack('<f', after[4:8])[0],
                             'region': key, 'address': body, 'after_hex': after.hex()}
             plan['unsupported'] = [g for g in plan['unsupported'] if g['field'] not in ('identity.height', 'identity.height_cm')]
         for body, (ptr, plan) in changed_bodies.items():
             try:
-                self.extra_regions.extend(self.body_cache.require(body, ptr))
+                cache = self.appearance_cache if plan.get('native_sculpt_appearance') else self.body_cache
+                self.extra_regions.extend(cache.require(body, ptr))
             except ValueError as exc:
                 raise ValueError(plan['destination']['name'] + ': ' + str(exc)) from exc
-        self.body_ownership = {'bodies': [self.body_cache.describe(b) for b in changed_bodies],
+        self.body_ownership = {'bodies': [(self.appearance_cache if p.get('native_sculpt_appearance') else self.body_cache).describe(b)
+                                        for b, (_, p) in changed_bodies.items()],
                                'read_bytes': 0, 'exhaustive_scan_performed': False,
                                'targeted_validation_performed': True,
                                'changed_body_blocks': len(changed_bodies), 'unchanged_body_blocks': len(bodies) - len(changed_bodies),
                                'policy': 'Reuse initial ownership evidence only after targeted destination, pointer, known-owner, editor-context and allocation checks. Unknown ownership blocks the requested operation; no automatic exhaustive fallback.'}
+
+    def _prepare_sculpts(self, evidence_hash):
+        from scanner.injection_transaction import Region, Patch
+        changed = []
+        for plan in self.plans:
+            source = plan.get('native_sculpt_appearance')
+            if not source:
+                continue
+            owner = plan['destination']['player']
+            pointer = struct.unpack_from('<Q', self.records[owner], 0x80)[0]
+            before = self.reader.read_or_raise(pointer, 456)
+            after = bytes.fromhex(source['sculpt_hex'])
+            key = 'sculpt:' + hex(pointer)
+            self.extra_regions.append(Region(key, pointer, before))
+            if before != after:
+                self.extra_regions.extend(self.sculpt_cache.require(pointer, owner))
+                self.patches.append(Patch(key, 0, before, after, 'appearance.native_sculpt', evidence_hash))
+                changed.append(self.sculpt_cache.describe(pointer))
+            plan['sculpt'] = {'region': key, 'address': pointer, 'after_hex': after.hex(),
+                              'source_record_sha256': source['source_record_sha256'],
+                              'visual_injection_verified': False}
+        self.body_ownership['sculpts'] = changed
 
     def begin_operation(self):
         self.metrics = self.reader.metrics = Metrics()
@@ -782,6 +912,13 @@ class RosterSession:
             if raw[0x58:0x64] != region.before[0x58:0x64] or raw[0x88:0x90] != region.before[0x88:0x90]:
                 raise ValueError('Destination structural identity or body pointer changed before write.')
             return
+        if patch.region.startswith('sculpt:'):
+            pointer = int(patch.region.split(':', 1)[1], 16)
+            owners = [a for a, raw in self.records.items() if struct.unpack_from('<Q', raw, 0x80)[0] == pointer]
+            if len(owners) != 1:
+                raise ValueError('Sculpt storage is shared by canonical players')
+            self.sculpt_cache.require(pointer, owners[0])
+            return
         if not patch.region.startswith('body:'):
             return
         from scanner.injection_transaction import read_regions
@@ -799,7 +936,8 @@ class RosterSession:
         owners = self.body_owner_index.get(body, [])
         if len(owners) != 1:
             raise ValueError('Linked body ownership is ambiguous; no body write or rollback was performed.')
-        self.body_cache.require(body, owners[0])
+        cache = self.appearance_cache if len(patch.after) == 132 else self.body_cache
+        cache.require(body, owners[0])
 
     def save_failure(self, message):
         path = injection_workspace() / ('failed-' + uuid.uuid4().hex + '.json')
@@ -819,6 +957,8 @@ class RosterSession:
         self.expected_regions = {r.name: r.before for r in self.regions}
         self.records = {ptr: self.expected_regions['player:' + hex(ptr)] for ptr in self.records}
         if hasattr(self, 'body_cache'): self.body_cache.records = self.records
+        if hasattr(self, 'sculpt_cache'): self.sculpt_cache.records = self.records
+        if hasattr(self, 'appearance_cache'): self.appearance_cache.records = self.records
         definitions = {f['field']: f for f in self.registry['fields']}
         for slot in [s for t in self.teams for s in t['slots']] + self.references:
             raw = self.records[slot['player']]
@@ -854,6 +994,13 @@ class RosterSession:
                                    'expected': f['decoded_after'], 'matches': value == f['decoded_after']})
                 if actual[plan['body']['region']].hex() != plan['body']['after_hex']:
                     raise ValueError('Linked body readback failed.')
+                if plan.get('sculpt'):
+                    if actual[plan['sculpt']['region']].hex() != plan['sculpt']['after_hex']:
+                        raise ValueError('Linked facial sculpt readback failed.')
+                    checks.append({'card': plan['card_identity'], 'field': 'appearance.native_sculpt',
+                                   'matches': True, 'bytes': 456})
+                    checks.append({'card': plan['card_identity'], 'field': 'appearance.native_body',
+                                   'matches': True, 'bytes': 132})
             if not all(c['matches'] for c in checks):
                 raise ValueError('Field-level readback failed.')
             self.metrics.count('verified_fields', len(checks))

@@ -46,7 +46,7 @@ def inspect_teams(reader, scan, *, allow_unlabeled=False):
                 else:
                     # Follow the actual reference even if a conservative pool
                     # filter rejected the record; never omit an occupied slot.
-                    first = utf16_fixed_field(raw, 0x24, 0x28)
+                    first = utf16_fixed_field(raw, 0x24, 0x24)
                     last = utf16_fixed_field(raw, 0, 0x24)
                     item.update(readable_stable=True, name=(first + ' ' + last).strip(),
                                 first_name=first, last_name=last, record_sha256=sha(raw), raw_hex=raw.hex(),

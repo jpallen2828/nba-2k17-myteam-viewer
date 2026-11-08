@@ -1,4 +1,4 @@
-"""Optional hook setup and serialized, read-only live roster monitoring."""
+"""Optional hook setup, name presentation and serialized roster monitoring."""
 from __future__ import annotations
 
 import os
@@ -60,7 +60,8 @@ def hook_setup_guidance(installation, process=None):
     return 'Choose the game installation folder to check the hook and its required mod loader.'
 
 
-def collect_snapshot(manager, game_dir, roster_file, *, synchronize=True):
+def collect_snapshot(manager, game_dir, roster_file, *, synchronize=True,
+                     name_companion=None, name_enabled=False):
     """Keep discovery separate from roster writes and feature-activation claims."""
     probe = game_hook.probe_processes()
     processes = probe['processes']
@@ -89,8 +90,16 @@ def collect_snapshot(manager, game_dir, roster_file, *, synchronize=True):
         live = sync_roster(manager, roster_file, process)
     else:
         live = {'state': 'paused', 'message': 'Automatic roster refresh is paused.'}
+    name_status = None
+    if name_companion is not None:
+        if error:
+            name_companion.close()
+            name_status = {'state': 'error', 'message': 'Name presentation paused: ' + error}
+        else:
+            name_status = name_companion.update(process, enabled=name_enabled)
     return {'game_dir': str(game_dir or ''), 'process': process, 'probe': probe,
-            'installation': inspection, 'installation_error': inspection_error, 'sync': live}
+            'installation': inspection, 'installation_error': inspection_error, 'sync': live,
+            'name_presentation': name_status}
 
 
 class _Signals(QObject):
@@ -123,6 +132,9 @@ class GameConnectionController(QObject):
         self.game_dir = str(self.settings.value('game_directory', ''))
         self.roster_file = str(self.settings.value('roster_file', ''))
         self.auto_refresh = str(self.settings.value('auto_refresh', 'true')).lower() in ('true', '1')
+        self.name_enabled = str(self.settings.value('full_shai_name', 'true')).lower() in ('true', '1')
+        from .name_presentation import NamePresentationController
+        self.name_companion = NamePresentationController()
         self.snapshot = {}
         self.active, self.closing, self.job = False, False, None
         self._generation = 0
@@ -162,6 +174,12 @@ class GameConnectionController(QObject):
         self._generation += 1
         self.refresh(force=True)
 
+    def set_name_presentation(self, enabled):
+        self.name_enabled = bool(enabled)
+        self.settings.setValue('full_shai_name', self.name_enabled)
+        self._generation += 1
+        self.refresh(force=True)
+
     def _start(self, function, completed):
         if self.active or self.closing:
             return False
@@ -183,6 +201,7 @@ class GameConnectionController(QObject):
             return
         generation = self._generation
         game_dir, roster_file = self.game_dir, self.roster_file
+        name_enabled = self.name_enabled
         synchronize = self.auto_refresh or refresh_roster or self._manual_followup
         self._followup = self._manual_followup = False
 
@@ -199,7 +218,8 @@ class GameConnectionController(QObject):
             self.snapshot_changed.emit(snapshot)
 
         self._start(lambda: collect_snapshot(self.manager, game_dir, roster_file,
-                                             synchronize=synchronize), completed)
+                                             synchronize=synchronize, name_companion=self.name_companion,
+                                             name_enabled=name_enabled), completed)
 
     def install(self):
         directory = self.game_dir
@@ -238,6 +258,8 @@ class GameConnectionController(QObject):
     def _finish(self):
         self.active, self.job = False, None
         self._completed = None
+        if self.closing:
+            self.name_companion.close()
         self.activity_changed.emit(False)
         self.idle.emit()
         if self._followup and not self.closing:
@@ -249,6 +271,8 @@ class GameConnectionController(QObject):
         self.timer.stop()
         if self.active:
             self.manager.cancel()
+        else:
+            self.name_companion.close()
         return not self.active
 
 
@@ -283,7 +307,7 @@ class GameConnectionPage(QWidget):
         self.auto.toggled.connect(controller.set_auto_refresh)
         root.addWidget(self.auto)
         self.connection_help = _label('Live roster refresh works separately from the hook. '
-            'The hook loads when NBA 2K17 starts; this app does not attach it to a running game.', 'muted')
+            'The mod-file hook loads when NBA 2K17 starts. Full-name presentation below connects while MyTEAM is open.', 'muted')
         root.addWidget(self.connection_help)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -349,6 +373,17 @@ class GameConnectionPage(QWidget):
         self.operation_status = _label('', 'muted')
         settings_layout.addWidget(self.operation_status)
         body.addWidget(settings)
+
+        names = QGroupBox('Live name presentation')
+        names_layout = QVBoxLayout(names)
+        self.full_name = QCheckBox('Show Shai Gilgeous-Alexander’s full name in menus and on jerseys')
+        self.full_name.setChecked(controller.name_enabled)
+        self.full_name.toggled.connect(controller.set_name_presentation)
+        names_layout.addWidget(self.full_name)
+        names_layout.addWidget(_label('Keep MyTEAM open while playing. The roster stores a bounded name; this companion restores the hyphen when the game draws it. After enabling, reopen the player view to refresh an existing jersey.', 'muted'))
+        self.name_status = _label('Waiting for the game connection.', 'notice')
+        names_layout.addWidget(self.name_status)
+        body.addWidget(names)
 
         roster = QGroupBox('Live roster · read only')
         roster_layout = QVBoxLayout(roster)
@@ -437,6 +472,8 @@ class GameConnectionPage(QWidget):
         process = snapshot.get('process')
         installation = snapshot.get('installation') or {}
         live = snapshot.get('sync') or {}
+        names = snapshot.get('name_presentation') or {}
+        self.name_status.setText(names.get('message', 'Waiting for the game connection.'))
         if process:
             if _hook_unsupported(installation, process):
                 hook = 'Bundled hook does not support this game build'
@@ -518,6 +555,7 @@ class GameConnectionPage(QWidget):
 
     def update_controls(self, *_):
         idle = not self.controller.active and not self.controller.manager.busy
+        self.full_name.setEnabled(idle)
         installation = self.controller.snapshot.get('installation') or {}
         config = installation.get('config') or {}
         valid_config = config.get('exists') and not config.get('errors')

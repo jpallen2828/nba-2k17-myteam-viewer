@@ -21,7 +21,7 @@ from .college_lookup import index_colleges, resolve_college, read_label
 
 
 def name_of(raw):
-    return (utf16_fixed_field(raw, 0x24, 0x28)+' '+utf16_fixed_field(raw, 0, 0x24)).strip()
+    return (utf16_fixed_field(raw, 0x24, 0x24)+' '+utf16_fixed_field(raw, 0, 0x24)).strip()
 
 
 def verify_evidence(root, registry):
@@ -77,6 +77,10 @@ def compile_values(profile, source, destination, registry):
         if actual == identity['name']:
             projected.append({'field': 'identity.name', 'value': identity.pop('name'),
                               'via': ['identity.first_name', 'identity.last_name']})
+    if 'last_name' in identity:
+        identity['localized_last_name_crc'] = 0
+        resolved['origins']['identity.localized_last_name_crc'] = {
+            'layer': 'explicit_policy', 'policy': 'INLINE_SURNAME_DISPLAYS_SAVED_CARD_NAME'}
     preview = preview_record(destination, resolved['values'], registry)
     gaps = list(preview['unsupported'])
     gaps += [{'field': 'badges.'+key, 'reason': 'Authored value explicitly missing; absence is not established'}

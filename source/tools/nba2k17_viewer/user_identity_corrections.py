@@ -4,13 +4,29 @@
 def apply_player_injection_corrections(card):
     """Apply saved user choices after archive artwork and template resolution."""
     from .face_ids import normalized_name
+    from .native_sculpt_faces import apply_native_sculpt_face
+    apply_native_sculpt_face(card)
+    from .sculpted_appearance import apply_sculpted_appearance
+    apply_sculpted_appearance(card)
     identity = card['identity']['values']
     name = normalized_name(identity.get('name') or '')
-    if name == 'domantassabonis':
+    metadata = card.get('gameplay_metadata', {})
+    custom_face = (str(card.get('source', {}).get('source_card_id', '')).startswith('custom-')
+                   and metadata.get('statuses', {}).get('face_id') in ('CUSTOM_AUTHORED', 'MANUAL_VERIFIED')
+                   and metadata.get('values', {}).get('face_id') not in (None, 1))
+    if name == 'kobebryant' and str(card['source']['source_card_id']) in ('20453', '8010'):
+        updates = [('gameplay_metadata', 'face_id', 195, 'USER_SUPPLIED_FACE_ID'),
+                   ('gameplay_metadata', 'portrait_id', 195, 'USER_CONFIRMED_FACE_PORTRAIT_RULE')]
+        date = '2026-10-23'
+        reason = 'User specified face and portrait 195 for Kobe cards 20453 and 8010, and year 2010 for card 20453.'
+        if str(card['source']['source_card_id']) == '20453':
+            updates.extend([('identity', 'card_year', 2010, 'USER_CORRECTED'),
+                            ('identity', 'represented_season', '2010', 'USER_CORRECTED')])
+    elif name == 'domantassabonis' and not custom_face:
         updates = [('gameplay_metadata', 'face_id', 1, 'USER_SUPPLIED_FACE_ID')]
         date = '2026-10-02'
         reason = 'User specified face ID 1 for all Domantas Sabonis cards.'
-    elif name == 'jonathangibson':
+    elif name == 'jonathangibson' and not custom_face:
         updates = [('gameplay_metadata', 'face_id', 1, 'USER_SUPPLIED_FACE_ID')]
         date = '2026-10-10'
         reason = 'User specified face ID 1 for Jonathan Gibson cards.'

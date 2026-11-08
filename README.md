@@ -75,6 +75,8 @@ Choose the roster file currently open in offline Roster Creator. Automatic refre
 
 The supplied hook has no exposed runtime control API, so its settings cannot be hot-reloaded. Launch the game from its installation folder so it can find the hook configuration. See **Hook documentation** on the connection page for the original author's instructions and distribution terms.
 
+**Live name presentation** is a separate companion on the same page. It restores Shai Gilgeous-Alexander's full surname in the reviewed menu and jersey-rendering paths while MyTEAM is open. His saved roster fields remain safely terminated within the game's native limit. The four Shai cards retain the full hyphenated name and artwork in MyTEAM. If a jersey was already generated before enabling the companion, view another player and reopen Shai to refresh it. The companion checks the supported executable and exact hook sites, and detaches when MyTEAM closes.
+
 ## Build from source
 
 Use Windows and Python 3.13. Download the optional `NBA.2K17.Build.Resources.zip` from the same release and extract it. It contains the matching Studio resources and local background-removal model.

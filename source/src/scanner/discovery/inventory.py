@@ -92,7 +92,7 @@ def build_inventory(root):
         row.update(destination=destination, encoding=encoding, confidence=confidence,
                    status='CONTROLLED_READ_MAPPING' if controlled else 'CANDIDATE_LAYOUT', evidence=evidence)
         row['completion'].update(controlled=controlled, restoration=restored)
-    for name, off, length in [('first_name', 0x24, 0x28), ('last_name', 0, 0x24)]:
+    for name, off, length in [('first_name', 0x24, 0x24), ('last_name', 0, 0x24)]:
         mapped('identity.' + name, {'offset': off, 'length': length, 'codec': 'utf16le'}, 'UTF-16LE fixed field; edit limits untested',
                [str(session / 'reload-wall-reference-scan.json')], confidence='MULTI_RECORD_READ')
     mapped('identity.jersey_number', {'offset': 0x69, 'size': 2, 'shift': 5, 'mask': 0xfe0, 'codec': 'packed'},
@@ -270,7 +270,7 @@ def make_plan(inventory, family):
         elif field == 'identity.weight':
             values = ['200 lb', '250 lb', '251 lb']
         elif field == 'identity.first_name':
-            values = ['LeBron', 'Abcdefghijklmnopqrs', 'Abcdefghijklmnopqrst']
+            values = ['LeBron', 'Abcdefghijklmnopq', 'Abcdefghijklmnopqr']
         elif field == 'identity.last_name':
             values = ['McGrady', 'Abcdefghijklmnopq', 'Abcdefghijklmnopqr']
         elif family == 'hot_zones':

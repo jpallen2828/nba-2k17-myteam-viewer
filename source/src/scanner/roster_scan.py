@@ -21,7 +21,7 @@ def sha(raw):
 def identify_candidate(raw):
     if len(raw) != ROSTER_PLAYER_RECORD_SIZE:
         return None
-    first = utf16_fixed_field(raw, 0x24, 0x28)
+    first = utf16_fixed_field(raw, 0x24, 0x24)
     last = utf16_fixed_field(raw, 0, 0x24)
     def valid(s):
         return len(s) < 22 and all(c.isalpha() or c in " .'-" for c in s)

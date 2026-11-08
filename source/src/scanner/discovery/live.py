@@ -160,7 +160,7 @@ def next_batch(session, family, inventory, *, team=None, player=None, checkpoint
             for i, address in enumerate(pointers):
                 if not address: continue
                 raw = source.reader.read_or_raise(address,0x460)
-                name = (utf16_fixed_field(raw,0x24,0x28)+' '+utf16_fixed_field(raw,0,0x24)).strip()
+                name = (utf16_fixed_field(raw,0x24,0x24)+' '+utf16_fixed_field(raw,0,0x24)).strip()
                 if name == player and raw == source.reader.read_or_raise(address,0x460):
                     matches.append((i,address))
             if len(matches)!=1:

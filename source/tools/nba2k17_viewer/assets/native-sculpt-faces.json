@@ -1,0 +1,390 @@
+{
+  "format": "nba2k17-native-sculpt-faces/v1",
+  "captured_date": "2026-11-03",
+  "capture_sha256": "d1c510f18fa752a376165a3e4fddc93d52a61b6071b0f92bf73e2f67688a8ed6",
+  "executable_sha256": "86C9D5396761E64567F8EC6233BD1CCB58F483D81455D055BB5C6C9444076A35",
+  "field": {
+    "field": "gameplay_metadata.face_id",
+    "offset": 100,
+    "size": 2,
+    "codec": "uint"
+  },
+  "policy": "Captured native sculpted-player face IDs. Preserve portrait, speech, and distinct custom cyberface choices. Face selection alone does not establish sculpt transfer.",
+  "players": {
+    "alexabrines": {
+      "name": "Alex Abrines",
+      "face_id": 1,
+      "known_card_ids": [
+        "7277"
+      ],
+      "replaced_face_ids": [
+        1,
+        7277
+      ],
+      "source_record_sha256": "c7252a8b9fcd72153a1da8f377363e881b72e0a74617d13d6d12bb2545aae406",
+      "compatible_source_record_sha256": [
+        "c7252a8b9fcd72153a1da8f377363e881b72e0a74617d13d6d12bb2545aae406",
+        "e0699e03099d3f03361f8bac080e25988648f4eac3675714a40f7d6116f5edcf"
+      ],
+      "captured_version_id": 7277,
+      "captured_portrait_id": 7277,
+      "source_teams": [
+        "Oklahoma City Thunder"
+      ]
+    },
+    "bricejohnson": {
+      "name": "Brice Johnson",
+      "face_id": 1,
+      "known_card_ids": [
+        "7226"
+      ],
+      "replaced_face_ids": [
+        1,
+        7226
+      ],
+      "source_record_sha256": "6fc1e9ad4ebf88d4ced6ddbf30f021814a6fef97e66df737824417d166e76a53",
+      "compatible_source_record_sha256": [
+        "6fc1e9ad4ebf88d4ced6ddbf30f021814a6fef97e66df737824417d166e76a53",
+        "edb89f24707fdd44fbf3c4fb1b7f47062011aa1101d3c3a980a290fef80e88cb"
+      ],
+      "captured_version_id": 7226,
+      "captured_portrait_id": 7226,
+      "source_teams": [
+        "Los Angeles Clippers"
+      ]
+    },
+    "brynforbes": {
+      "name": "Bryn Forbes",
+      "face_id": 1,
+      "known_card_ids": [
+        "20502"
+      ],
+      "replaced_face_ids": [
+        1,
+        7291
+      ],
+      "source_record_sha256": "244e995b4f39728e4f285a60cc39853e247e490a471ec4e85f47634669e0c0a0",
+      "compatible_source_record_sha256": [
+        "244e995b4f39728e4f285a60cc39853e247e490a471ec4e85f47634669e0c0a0",
+        "a50da86afc3bdd377f900379aa997a6f45798f53fa49f65693ef051b847bc767"
+      ],
+      "captured_version_id": 7291,
+      "captured_portrait_id": 7291,
+      "source_teams": [
+        "San Antonio Spurs"
+      ]
+    },
+    "carislevert": {
+      "name": "Caris LeVert",
+      "face_id": 1,
+      "known_card_ids": [
+        "7233"
+      ],
+      "replaced_face_ids": [
+        1,
+        7233
+      ],
+      "source_record_sha256": "b35819739bd57d14baca40bb5595b776ace354e04ecfecb766b610f8737a17b2",
+      "compatible_source_record_sha256": [
+        "b35819739bd57d14baca40bb5595b776ace354e04ecfecb766b610f8737a17b2",
+        "bcba4993e01ff1ec9dd4e8bcec28931eb6afbc64d122d9a94abb864688e20098"
+      ],
+      "captured_version_id": 7233,
+      "captured_portrait_id": 7233,
+      "source_teams": [
+        "Brooklyn Nets"
+      ]
+    },
+    "davisbertans": {
+      "name": "Davis Bertans",
+      "face_id": 1,
+      "known_card_ids": [
+        "7276"
+      ],
+      "replaced_face_ids": [
+        1,
+        7276
+      ],
+      "source_record_sha256": "a5ecea45c4bb586535dd08368b96277415b495e4ed173db473c18e9c988ce51b",
+      "compatible_source_record_sha256": [
+        "278d7b2be4337727e0a19d5c6c0f7a1b00faa63db4add6ab761271645b95ccb0",
+        "a5ecea45c4bb586535dd08368b96277415b495e4ed173db473c18e9c988ce51b"
+      ],
+      "captured_version_id": 7276,
+      "captured_portrait_id": 7276,
+      "source_teams": [
+        "San Antonio Spurs"
+      ]
+    },
+    "diamondstone": {
+      "name": "Diamond Stone",
+      "face_id": 1,
+      "known_card_ids": [
+        "7218"
+      ],
+      "replaced_face_ids": [
+        1,
+        7218
+      ],
+      "source_record_sha256": "ee211e6d5a4683be9f4a24483774d58ca9c4a608d21712eef415686f57948947",
+      "compatible_source_record_sha256": [
+        "a93de06ccfef675b3283556c3d4a80d4ea96ae12e810cc0d96fefb6218923c2c",
+        "ee211e6d5a4683be9f4a24483774d58ca9c4a608d21712eef415686f57948947"
+      ],
+      "captured_version_id": 7218,
+      "captured_portrait_id": 7218,
+      "source_teams": [
+        "Los Angeles Clippers"
+      ]
+    },
+    "domantassabonis": {
+      "name": "Domantas Sabonis",
+      "face_id": 1,
+      "known_card_ids": [
+        "7212",
+        "custom-studio-ec9257a3fb97530eca7d4eb0083173654c5d5d7dea382c9fc22b87847b6819b0"
+      ],
+      "replaced_face_ids": [
+        1
+      ],
+      "source_record_sha256": "731ffd3b719bbc0d3bb44012c1dad23dab17ab6e95de7322fc844ec6a526ba75",
+      "compatible_source_record_sha256": [
+        "21300fc75eaf7a0c9d5ca7bd250982091757c5ee91c9bdc1f87fdef97a7daf44",
+        "731ffd3b719bbc0d3bb44012c1dad23dab17ab6e95de7322fc844ec6a526ba75"
+      ],
+      "captured_version_id": 7212,
+      "captured_portrait_id": 7212,
+      "source_teams": [
+        "Oklahoma City Thunder"
+      ]
+    },
+    "georgesniang": {
+      "name": "Georges Niang",
+      "face_id": 1,
+      "known_card_ids": [
+        "7250"
+      ],
+      "replaced_face_ids": [
+        1,
+        7250
+      ],
+      "source_record_sha256": "bd6500e995f558de945a119af569a5a5a18e16c65b06e99341bf90ce1ce0cb4a",
+      "compatible_source_record_sha256": [
+        "5a5901f18a351f127e42dfc246438d6e327a51b2f5a6f16befed7b02bcb7a9e1",
+        "bd6500e995f558de945a119af569a5a5a18e16c65b06e99341bf90ce1ce0cb4a"
+      ],
+      "captured_version_id": 7250,
+      "captured_portrait_id": 7250,
+      "source_teams": [
+        "Indiana Pacers"
+      ]
+    },
+    "henryellenson": {
+      "name": "Henry Ellenson",
+      "face_id": 1,
+      "known_card_ids": [
+        "7208"
+      ],
+      "replaced_face_ids": [
+        1,
+        7208
+      ],
+      "source_record_sha256": "b63a404dfb6c3837983422f71a5739d408cce750e1f83953a9381df5b72e09eb",
+      "compatible_source_record_sha256": [
+        "b63a404dfb6c3837983422f71a5739d408cce750e1f83953a9381df5b72e09eb",
+        "ed826976f7e67e8a68e6ecaff7750320855ca3b04d70394a488cf110c5530782"
+      ],
+      "captured_version_id": 7208,
+      "captured_portrait_id": 7208,
+      "source_teams": [
+        "Detroit Pistons"
+      ]
+    },
+    "jakobpoeltl": {
+      "name": "Jakob Poeltl",
+      "face_id": 1,
+      "known_card_ids": [
+        "7207"
+      ],
+      "replaced_face_ids": [
+        1,
+        7207
+      ],
+      "source_record_sha256": "e71deaa1a94ffade12619298b8e5069a2a6c63a2c7f05e00460f13a679e594ec",
+      "compatible_source_record_sha256": [
+        "c71aef2e761fb960c333bbc4f4d15abbcf1390f3db7840b19ec2a6c3b4eacb12",
+        "e71deaa1a94ffade12619298b8e5069a2a6c63a2c7f05e00460f13a679e594ec"
+      ],
+      "captured_version_id": 7207,
+      "captured_portrait_id": 7207,
+      "source_teams": [
+        "Toronto Raptors"
+      ]
+    },
+    "jonathangibson": {
+      "name": "Jonathan Gibson",
+      "face_id": 1,
+      "known_card_ids": [
+        "7274"
+      ],
+      "replaced_face_ids": [
+        1
+      ],
+      "source_record_sha256": "2b7899d67dd1b844498bfdd7f24ee4239da9492b37b7486926a68d391f6ddcc9",
+      "compatible_source_record_sha256": [
+        "2b7899d67dd1b844498bfdd7f24ee4239da9492b37b7486926a68d391f6ddcc9",
+        "a76f319cdad064e9f9dfa799ff977160fd90f7265d64777bf920be23c538f393"
+      ],
+      "captured_version_id": 7274,
+      "captured_portrait_id": 7274,
+      "source_teams": []
+    },
+    "marshallplumlee": {
+      "name": "Marshall Plumlee",
+      "face_id": 1,
+      "known_card_ids": [
+        "7273"
+      ],
+      "replaced_face_ids": [
+        1,
+        7273
+      ],
+      "source_record_sha256": "b756ad29fa72109737e31698d3c790ba37d7f58c577e27a820af99521a6372ef",
+      "compatible_source_record_sha256": [
+        "0e0c6f3cbbc9c8e649c2d5acca94688d74dcbf60cfa995b2926e69f3230d747f",
+        "b756ad29fa72109737e31698d3c790ba37d7f58c577e27a820af99521a6372ef"
+      ],
+      "captured_version_id": 7273,
+      "captured_portrait_id": 7273,
+      "source_teams": [
+        "New York Knicks"
+      ]
+    },
+    "mauricendour": {
+      "name": "Maurice Ndour",
+      "face_id": 1,
+      "known_card_ids": [
+        "4840"
+      ],
+      "replaced_face_ids": [
+        1,
+        4840
+      ],
+      "source_record_sha256": "5151236557c9f7a5644751fe0c8eb9fcec98042f1429c9d1ceab2e1613192f8d",
+      "compatible_source_record_sha256": [
+        "5151236557c9f7a5644751fe0c8eb9fcec98042f1429c9d1ceab2e1613192f8d",
+        "bd8a986fc8185652aaad8eb073261f3a517aa0cdecffa2da84b64394192a72fd"
+      ],
+      "captured_version_id": 4840,
+      "captured_portrait_id": 4840,
+      "source_teams": [
+        "New York Knicks"
+      ]
+    },
+    "michaelgbinije": {
+      "name": "Michael Gbinije",
+      "face_id": 1,
+      "known_card_ids": [
+        "7249"
+      ],
+      "replaced_face_ids": [
+        1,
+        7249
+      ],
+      "source_record_sha256": "bb338579971c1152918fd162e07f343befe89a21ab48f5be8326235149103726",
+      "compatible_source_record_sha256": [
+        "2793dbf7f0175270cf5828ca2a4b2b817537d48493f5355ef18f23cd64626955",
+        "bb338579971c1152918fd162e07f343befe89a21ab48f5be8326235149103726"
+      ],
+      "captured_version_id": 7249,
+      "captured_portrait_id": 7249,
+      "source_teams": [
+        "Detroit Pistons"
+      ]
+    },
+    "paulzipser": {
+      "name": "Paul Zipser",
+      "face_id": 1,
+      "known_card_ids": [
+        "7248"
+      ],
+      "replaced_face_ids": [
+        1,
+        7248
+      ],
+      "source_record_sha256": "f1b7caca0da8967a43b592404695dffce32634bbacdb9e2db2a992d1839b4cf2",
+      "compatible_source_record_sha256": [
+        "70c8cb991092bdf47a21ce8b443223145817ff2647a2c11024bbf203f7c5859c",
+        "f1b7caca0da8967a43b592404695dffce32634bbacdb9e2db2a992d1839b4cf2"
+      ],
+      "captured_version_id": 7248,
+      "captured_portrait_id": 7248,
+      "source_teams": [
+        "Chicago Bulls"
+      ]
+    },
+    "stephenzimmerman": {
+      "name": "Stephen Zimmerman",
+      "face_id": 1,
+      "known_card_ids": [
+        "7242"
+      ],
+      "replaced_face_ids": [
+        1,
+        7242
+      ],
+      "source_record_sha256": "91be777cb58e112ac3d95de25b666943daae8ee1b9dc0290a497f1d83cdb4084",
+      "compatible_source_record_sha256": [
+        "80da4b4dca961af9220d44e233a2eb559f0be45f7c860c0a9c684cc6ce543316",
+        "91be777cb58e112ac3d95de25b666943daae8ee1b9dc0290a497f1d83cdb4084"
+      ],
+      "captured_version_id": 7242,
+      "captured_portrait_id": 7242,
+      "source_teams": [
+        "Orlando Magic"
+      ]
+    },
+    "willyhernangomez": {
+      "name": "Willy Hernangomez",
+      "face_id": 1,
+      "known_card_ids": [
+        "4971"
+      ],
+      "replaced_face_ids": [
+        1,
+        4971
+      ],
+      "source_record_sha256": "4b8c2d63fd647e5a1337bdb9ee15fb625aa4291b3a13a2d8827e903e0ef072b5",
+      "compatible_source_record_sha256": [
+        "4247ac2ec69de9f7321d3c6eacd9b167da2a07d37e9ffffafb74e544e33a9508",
+        "4b8c2d63fd647e5a1337bdb9ee15fb625aa4291b3a13a2d8827e903e0ef072b5"
+      ],
+      "captured_version_id": 4971,
+      "captured_portrait_id": 4971,
+      "source_teams": [
+        "New York Knicks"
+      ]
+    },
+    "yogiferrell": {
+      "name": "Yogi Ferrell",
+      "face_id": 1,
+      "known_card_ids": [
+        "20340"
+      ],
+      "replaced_face_ids": [
+        1,
+        7298
+      ],
+      "source_record_sha256": "7f6625ee214e2879a36a72662791ad579029e75d7f1d71e171f74b67de0c0968",
+      "compatible_source_record_sha256": [
+        "729332183ea0464516b3ec568a625612eaf9cd0a8d61011208155da3f9edb328",
+        "7f6625ee214e2879a36a72662791ad579029e75d7f1d71e171f74b67de0c0968"
+      ],
+      "captured_version_id": 7298,
+      "captured_portrait_id": 7298,
+      "source_teams": [
+        "Dallas Mavericks"
+      ]
+    }
+  }
+}

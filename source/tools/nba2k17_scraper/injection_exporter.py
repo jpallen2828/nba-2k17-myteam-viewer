@@ -102,12 +102,23 @@ def _template_match(card: CanonicalCard) -> dict[str, Any] | None:
     return source if isinstance(source, dict) else None
 
 
+def normalize_player_id(section, key, value):
+    """Accept decimal ID text from editor/imports without weakening codec bounds."""
+    if section == 'gameplay_metadata' and key in {
+            'face_id', 'portrait_id', 'graphic_id', 'speech_id', 'commentary_identity_test'}:
+        if isinstance(value, str):
+            text = value.strip()
+            if text and text.isascii() and text.isdecimal():
+                return int(text)
+    return value
+
+
 def _section_overrides(card: CanonicalCard) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for section_name in ("identity", "attributes", "tendencies", "badges", "hot_zones", "signatures", "gear", "gameplay_metadata"):
         section = getattr(card, section_name)
         values = {
-            key: value
+            key: normalize_player_id(section_name, key, value)
             for key, value in section.values.items()
             if _exportable(section_name, key, value, section.statuses.get(key))
         }
@@ -137,7 +148,7 @@ def resolve_player_values(profile: Mapping[str, Any], template_defaults: Mapping
                 if preserve_durability and "durability" in key:
                     excluded.append(field)
                     continue
-                resolved.setdefault(section, {})[key] = deepcopy(value)
+                resolved.setdefault(section, {})[key] = deepcopy(normalize_player_id(section, key, value))
                 origins[field] = {"layer": layer}
                 if layer == "card":
                     origins[field].update(deepcopy(profile["override_evidence"][section][key]))

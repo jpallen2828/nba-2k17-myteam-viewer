@@ -29,28 +29,53 @@ class BodyOwnershipCache:
         self.canonical_allocations = {}
         self.auxiliary_references = tuple(auxiliary_references)
 
-    def auxiliary_region(self, reference, body, owner):
+    def auxiliary_regions(self, reference, body, owner):
         """Recognize only an exact build-bound alias verified by an in-game edit.
 
         This is a 0x138-byte auxiliary entry, not a 0x460-byte roster owner.
-        Unknown entries still fail closed. Every byte is watched through write
-        and undo; this method never authorizes modification of the entry.
+        Exact private-memory copies of that verified entry may occur in native
+        roster snapshots. Both the authoritative entry and each copy are
+        watched through write and undo; neither is ever modified here.
         """
         for definition in self.auxiliary_references:
             address = self.module_base + definition['rva']
-            if (reference != address + definition['body_offset']
-                    or owner != self.module_base + definition['owner_rva']):
+            if owner != self.module_base + definition['owner_rva']:
                 continue
-            raw = self.reader.read_or_raise(address, definition['size'])
             expected = bytearray.fromhex(definition['normalized_hex'])
             for offset in definition['rebase_offsets']:
                 value = struct.unpack_from('<Q', expected, offset)[0]
                 struct.pack_into('<Q', expected, offset, value + self.module_base)
+            if struct.unpack_from('<Q', expected, definition['body_offset'])[0] != body:
+                continue
+            raw = self.reader.read_or_raise(address, definition['size'])
             if (raw != bytes(expected)
                     or struct.unpack_from('<Q', raw, definition['body_offset'])[0] != body
                     or self.reader.read_or_raise(address, len(raw)) != raw):
                 raise ValueError('Verified auxiliary body reference changed')
-            return Region('body-alias:' + hex(address), address, raw)
+            original = Region('body-alias:' + hex(address), address, raw)
+            if reference == address + definition['body_offset']:
+                return (original,)
+            candidate = reference - definition['body_offset']
+            if candidate in self.records or candidate < 0:
+                continue
+            try:
+                allocation = self.reader.allocation_key(candidate)
+                # Copies must be private process memory, never another native
+                # table or an unverified mapped/image entry with similar bytes.
+                if len(allocation) != 6 or allocation[5] != 0x20000:
+                    continue
+                if self.reader.allocation_key(candidate + len(raw) - 1) != allocation:
+                    continue
+                copy = self.reader.read_or_raise(candidate, len(raw))
+                if copy != raw:
+                    continue
+                if (self.reader.read_or_raise(candidate, len(raw)) != copy
+                        or self.reader.read_or_raise(address, len(raw)) != raw
+                        or self.reader.allocation_key(candidate) != allocation):
+                    raise ValueError('Auxiliary body copy changed during discovery')
+            except OSError:
+                continue
+            return (original, Region('body-alias-copy:' + hex(candidate), candidate, copy))
         return None
 
     def context_regions(self, records, targets=None):
@@ -130,9 +155,10 @@ class BodyOwnershipCache:
                     raise ValueError('The canonical body reference was not found in the ownership scan')
                 copies = {}
                 for reference in sorted(refs):
-                    auxiliary = self.auxiliary_region(reference, body, owner)
+                    auxiliary = self.auxiliary_regions(reference, body, owner)
                     if auxiliary is not None:
-                        copies[auxiliary.address] = auxiliary
+                        for region in auxiliary:
+                            copies[region.address] = region
                         continue
                     address = reference - 0x88
                     raw = records.get(address)
@@ -184,7 +210,7 @@ class BodyOwnershipCache:
                     if new != region.before:
                         if region.name.startswith('owner-context:'):
                             raise ValueError('Unrelated editor context changed; ownership must be rediscovered')
-                        elif region.name.startswith('body-alias:'):
+                        elif region.name.startswith(('body-alias:', 'body-alias-copy:')):
                             raise ValueError('Verified auxiliary body reference changed')
                         elif region.name.startswith('ownership-root:'):
                             pointer = struct.unpack('<Q', new)[0]

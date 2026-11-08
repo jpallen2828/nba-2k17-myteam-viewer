@@ -3331,15 +3331,15 @@
       "field": "identity.first_name",
       "region": "player",
       "offset": 36,
-      "size": 40,
+      "size": 36,
       "codec": "utf16le",
-      "confidence": "MULTI_RECORD_READ_ENCODING_EDIT_LIMIT_UNTESTED",
+      "confidence": "NATIVE_ARRAY_LAYOUT_AND_SERIALIZED_WIDTH_CONFIRMED",
       "write_enabled": false,
       "injection_verified": false,
       "reference_uids": [
         "0/22/0/1"
       ],
-      "evidence_sha256": "7bcaad419e4e18e3a4fefd447506ffa19eb092e85d7ceafac6c5e674afcc5209"
+      "evidence_sha256": "ceb7150a91b6b1f4c520f3d10fe89813c6dc04f5aea96b67a13efefd98e1ce57"
     },
     {
       "field": "identity.last_name",
@@ -3347,13 +3347,26 @@
       "offset": 0,
       "size": 36,
       "codec": "utf16le",
-      "confidence": "MULTI_RECORD_READ_ENCODING_EDIT_LIMIT_UNTESTED",
+      "confidence": "NATIVE_ARRAY_LAYOUT_AND_SERIALIZED_WIDTH_CONFIRMED",
       "write_enabled": false,
       "injection_verified": false,
       "reference_uids": [
         "0/22/0/2"
       ],
-      "evidence_sha256": "7bcaad419e4e18e3a4fefd447506ffa19eb092e85d7ceafac6c5e674afcc5209"
+      "evidence_sha256": "ceb7150a91b6b1f4c520f3d10fe89813c6dc04f5aea96b67a13efefd98e1ce57"
+    },
+    {
+      "field": "identity.localized_last_name_crc",
+      "offset": 72,
+      "size": 4,
+      "codec": "uint",
+      "raw_max": 4294967295,
+      "region": "player",
+      "confidence": "NATIVE_DESCRIPTOR_AND_GETTER_CONFIRMED",
+      "write_enabled": false,
+      "injection_verified": false,
+      "reference_uids": [],
+      "evidence_sha256": "ceb7150a91b6b1f4c520f3d10fe89813c6dc04f5aea96b67a13efefd98e1ce57"
     },
     {
       "field": "identity.jersey_number",
@@ -9965,6 +9978,32 @@
       "confidence": "CONTROLLED_IN_GAME_HEIGHT_EDIT_SHARED_REFERENCE_UNCHANGED",
       "evidence_sha256": "dd32cd1fc2b6940fad6315443642789a44c841f5b7a4038e1bca1ef01444b12a",
       "additional_capture_sha256": "9e5d90e2b5d156e62d2e0fdebb642f0ad131a0bf777bfa605abbd5adc1a7167a"
+    },
+    {
+      "rva": 146919856,
+      "owner_rva": 143493504,
+      "size": 312,
+      "body_offset": 288,
+      "rebase_offsets": [
+        288,
+        296
+      ],
+      "normalized_hex": "4c0061006e0064006f006e0000000000000000000000000000000000000000000000000042007500640065006e0068006f006c007a0065007200000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3a0200003c323223322809605a2d0a2d322d3737320a0501a300000040420f04ff9fa0087770325099703250851d000000000048810201003d0c0000ffff00000000000000000000000000000000000000000000000000000000000013014141003c373c00000000000000000c12461300200000000000000000000011cab6e300000000d4982209000000004097b808000000000000000000000000",
+      "confidence": "CONTROLLED_IN_GAME_HEIGHT_EDIT_SHARED_REFERENCE_UNCHANGED",
+      "evidence_sha256": "cd6343c976b4a0507279e8d08dd446705366c04890dd61c1c7f187d3de42983d"
+    },
+    {
+      "rva": 146970088,
+      "owner_rva": 143493504,
+      "size": 312,
+      "body_offset": 288,
+      "rebase_offsets": [
+        288,
+        296
+      ],
+      "normalized_hex": "4a0061007900640065006e0000000000000000000000000000000000000000000000000042006f0065006e006900730063006800000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd0070000283c3c233232094f5a1e0532323232323c2806012b02000040420f00ff2fbd0694402250a5402250559d0300000004388100010035030500ffff000000000000000000000000000000000000000000000000000000000000140146460232232300000000000000000a12460d00280000000000000000000011cab6e300000000d4982209000000004862ba08000000000000000000000000",
+      "confidence": "CONTROLLED_IN_GAME_HEIGHT_EDIT_SHARED_REFERENCE_UNCHANGED",
+      "evidence_sha256": "cd6343c976b4a0507279e8d08dd446705366c04890dd61c1c7f187d3de42983d"
     }
   ]
 }

@@ -27,6 +27,7 @@ def main():
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
             raise ValueError(f'Hook build resource differs from the reviewed package: game_hook/{name}')
     command = [sys.executable, '-m', 'PyInstaller', '--clean', '--noconfirm', '--onefile', '--windowed',
+               '--collect-all', 'frida',
                '--name', '2K17 MyTEAM', '--paths', str(tools), '--paths', str(scanner),
                '--icon', str(tools / 'nba2k17_viewer/assets/myteam17.ico'),
                '--distpath', str(root / 'dist'), '--workpath', str(root / 'build'), '--specpath', str(root / 'build')]
@@ -42,7 +43,7 @@ def main():
     command.append(str(tools / 'run_myteam_viewer.py'))
     env = os.environ.copy()
     env['PATH'] = os.pathsep.join((str(Path(sys.executable).parent), str(Path(os.environ['SystemRoot']) / 'System32'), os.environ['SystemRoot']))
-    env['PYTHONPATH'] = os.pathsep.join((str(tools), str(scanner)))
+    env['PYTHONPATH'] = os.pathsep.join(filter(None, (str(tools), str(scanner), env.get('PYTHONPATH', ''))))
     subprocess.run(command, cwd=root, env=env, check=True)
 
 

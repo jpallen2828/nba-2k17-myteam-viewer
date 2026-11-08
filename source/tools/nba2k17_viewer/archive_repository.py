@@ -162,6 +162,8 @@ class ArchiveRepository:
         signatures = load_user_signatures(local_data/'curation/user_signatures.json',local_data.parents[2]) if local_data else {}
         for card in self.cards.values():
             restore_parent_template(card, self.cards)
+            from .user_identity_corrections import apply_player_injection_corrections
+            apply_player_injection_corrections(card)
             apply_user_signatures({'card':card},signatures.get(str(card['source']['source_card_id'])))
             populate_card_gear(card)
             if template := card.get('raw_source', {}).get('live_roster_template'):

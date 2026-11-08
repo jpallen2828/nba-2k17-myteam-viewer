@@ -1,0 +1,55 @@
+{
+  "format": "nba2k17-native-name-fields/v1",
+  "executable_sha256": "86c9d5396761e64567f8ec6233bd1ccb58f483d81455d055bb5c6c9444076a35",
+  "name_fields": [
+    {
+      "field": "identity.last_name",
+      "offset": 0,
+      "size": 36,
+      "codec": "utf16le",
+      "descriptor_rva": "0x1F46360",
+      "field_hash": "0x51D55A69",
+      "array_length": 18,
+      "serialized_bit_width": 288
+    },
+    {
+      "field": "identity.first_name",
+      "offset": 36,
+      "size": 36,
+      "codec": "utf16le",
+      "descriptor_rva": "0x1F46388",
+      "field_hash": "0xF45FB0F8",
+      "array_length": 18,
+      "serialized_bit_width": 288
+    }
+  ],
+  "localized_last_name": {
+    "field": "identity.localized_last_name_crc",
+    "offset": 72,
+    "size": 4,
+    "codec": "uint",
+    "raw_max": 4294967295,
+    "descriptor_rva": "0x1F463B0",
+    "field_hash": "0xF2B7D000",
+    "native_label": "LocalizedLastName",
+    "native_type": "string_crc",
+    "zero_means": "use inline last-name field"
+  },
+  "last_name_getter": {
+    "rva": "0x9DD050",
+    "bytes_hex": "40534883ec208b594885db7414e80eb38f008bd3488bc84883c4205be99fb08f00488bc14883c4205bc3",
+    "behavior": "If player+0x48 is nonzero, resolve that localization CRC; otherwise return player+0x00."
+  },
+  "constructor": {
+    "rva": "0x51FD20",
+    "name_array_words": 18,
+    "last_rep_stosw_rva": "0x51FD47",
+    "first_rep_stosw_rva": "0x51FD56",
+    "separate_adjacent_field_initialization_rva": "0x51FD6F"
+  },
+  "preserve_adjacent_range": [
+    76,
+    80
+  ],
+  "validation": "Native reflection, constructor, getter and serialized RDAT evidence; no live write authorized by this file."
+}

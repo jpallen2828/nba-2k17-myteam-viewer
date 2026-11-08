@@ -213,6 +213,54 @@ def test_known_copy_mapped_tendency_edit_can_be_renewed(cache):
     assert reader.exhaustive_calls==1
 
 
+@pytest.mark.parametrize('case', ['valid', 'changed_copy', 'mapped_copy', 'changed_native', 'other_owner', 'unverified'])
+def test_only_exact_private_copies_of_verified_auxiliary_entries_are_accepted(monkeypatch, case):
+    reader = Reader()
+    owner, body, native, copy = 0x10000, 0x80000, 0x90000, 0xa0000
+    raw = record('Host', body, 1)
+    auxiliary = bytearray(312)
+    auxiliary[:8] = b'NoahData'
+    struct.pack_into('<Q', auxiliary, 288, body)
+    reader.records = {owner: raw}
+    reader.data = {owner: raw, body: struct.pack('<ff', 208, 208), native: bytes(auxiliary),
+                   copy: bytes(auxiliary),
+                   **{rva: struct.pack('<Q', owner) for rva in SELECTED_RECORD_POINTER_RVAS}}
+    definition = {'rva': native, 'owner_rva': owner, 'size': 312, 'body_offset': 288,
+                  'rebase_offsets': [288], 'normalized_hex': auxiliary.hex()}
+    if case == 'changed_copy':
+        changed = bytearray(auxiliary); changed[40] ^= 1; reader.data[copy] = bytes(changed)
+    if case == 'changed_native':
+        changed = bytearray(auxiliary); changed[40] ^= 1; reader.data[native] = bytes(changed)
+    if case == 'other_owner':
+        reader.records[0x20000] = record('Another canonical player', body, 2)
+        reader.data[0x20000] = reader.records[0x20000]
+    original_allocation = reader.allocation_key
+    reader.allocation_key = lambda a: ((copy, copy, 4096, 4096, reader.allocations.get(copy, 4),
+                                        0x40000 if case == 'mapped_copy' else 0x20000)
+                                       if copy <= a < copy + 312 else original_allocation(a))
+    refs = {owner + 0x88, native + 288, copy + 288}
+    monkeypatch.setattr(module, 'scan_references', lambda *args: ({body: refs}, []))
+    cache = module.BodyOwnershipCache(reader, 0, lambda _: None,
+        auxiliary_references=[] if case == 'unverified' else [definition])
+    cache.discover(reader.records, {body})
+    if case != 'valid':
+        with pytest.raises(ValueError): cache.require(body, owner)
+        return
+    watched = cache.require(body, owner)
+    assert {r.address for r in watched if r.name.startswith('body-alias')} == {native, copy}
+    reader.data[body] = struct.pack('<ff', 210.82, 222.3)
+    cache.require(body, owner)
+    changed = bytearray(auxiliary); changed[40] ^= 1; reader.data[copy] = bytes(changed)
+    with pytest.raises(ValueError, match='auxiliary body reference changed'):
+        cache.require(body, owner)
+    reader.data[copy] = bytes(auxiliary)
+    cache.discover(reader.records, {body})
+    cache.require(body, owner)
+    reader.allocations[copy] = 2
+    with pytest.raises(ValueError, match='allocation changed'):
+        cache.require(body, owner)
+
+
 def test_failed_scan_retains_bytes_and_retries_in_diagnostics(cache,monkeypatch):
     from scanner.pointer_index import ScanFailure
     cache,reader=cache

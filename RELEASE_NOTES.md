@@ -1,16 +1,18 @@
-# NBA 2K17 MyTEAM v1.4.0
+# NBA 2K17 MyTEAM v1.5.0
 
-Updated November 7, 2026.
+Updated November 8, 2026.
 
-- Includes 2,200 cards and their original PNG artwork, with the latest saved custom cards and reusable templates.
-- Fixes Rasheed Wallace injection rejecting Face ID 389 when an editor or imported card stores the ID as text. Decimal player IDs now normalize before injection; native bounds and invalid-value checks remain enforced.
-- Adds Shai Gilgeous-Alexander's full hyphenated name to his four cards and artwork. Game Connection includes a live companion for full menu and jersey names while MyTEAM remains open. Menu and jersey presentation were confirmed after save/reload on the supported game build.
-- Corrects native first-name field boundaries and handles the separate localized surname selector explicitly, with preview, readback, rollback and Undo coverage.
-- Includes the latest player appearance corrections and reusable native sculpt transfer support, plus linked-storage ownership checks.
-- Retains Blacktop drafts, all draft budgets, automatic draft saves, card editing, draft audio and existing injection modes.
+- Adds editable wingspan directly below height in Card Studio. Choose Original to keep the captured length, or Custom to use a 0–100 slider with live centimeters and feet/inches.
+- Saves custom wingspan settings in editable projects and exported cards, and applies length and scale during injection with ownership checks, readback, rollback and Undo.
+- Shows both Original and Custom together when hovering over the mode selector, with no scrolling.
+- Adds wingspan to the archive Information tab. This displays only centimeters and feet/inches, without the mode label or slider number.
+- Includes all 2,200 saved cards and their original PNG artwork. Existing captured lengths remain unchanged unless a custom override is selected.
+- Retains the player-ID, native sculpt and full-name presentation fixes from v1.4.0, along with all team and draft modes.
 
-Download **NBA.2K17.MyTEAM.zip**, extract the entire archive, and run **2K17 MyTEAM.exe**. Keep the included `.project` folder beside the EXE. The build-resources ZIP is optional and only needed to build from source.
+The custom formula matches the edited Curry and Bol captures within 0.001 cm using standard body proportions. It is not a replacement for every native skeletal adjustment. The new slider's in-game visual result still requires testing; memory readback alone does not establish appearance.
 
-Existing users: follow [UPDATING.md](UPDATING.md) to preserve personal cards and lineups. The separate live name companion needs MyTEAM open while playing. External modded face/portrait assets are not included.
+Download **NBA.2K17.MyTEAM.zip**, extract the entire archive, and run **2K17 MyTEAM.exe**. Keep the included `.project` folder beside the EXE. **NBA.2K17.Build.Resources.zip** is optional and only needed to build from source.
 
-Validation includes 42 targeted numeric-ID/injection tests, native name-companion lifecycle checks, a packaged startup check and complete archive extraction checks. The requested 13-card Bulls injection matched all 4,069 mapped fields on immediate readback. Memory readback and visual/game-save confirmation are reported separately.
+Existing users: follow [UPDATING.md](https://github.com/jpallen2828/nba-2k17-myteam-viewer/blob/main/UPDATING.md) to preserve personal cards and lineups. External modded game assets are not included.
+
+Validation covers wingspan calculations, saved-card export, zero and repeated settings, linked-storage protection, readback, rollback and Undo. The packaged interface check passed with all 2,200 cards. Release packaging verifies extraction, PNG hashes, card values and reusable templates.

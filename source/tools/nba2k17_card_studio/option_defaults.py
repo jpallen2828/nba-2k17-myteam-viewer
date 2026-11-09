@@ -33,4 +33,8 @@ def studio_data(card):
     from .document import SECTIONS
     data={s:deepcopy(card.get(s, {'values':{}, 'statuses':{}})) for s in SECTIONS}
     defaults=(card.get('raw_source', {}).get('live_roster_template') or {}).get('defaults', {})
+    original = defaults.get('appearance', {}).get('wingspan_cm')
+    if original is not None:
+        data['identity'].setdefault('values', {})['source_wingspan_cm'] = original
+        data['identity'].setdefault('statuses', {})['source_wingspan_cm'] = 'LIVE_ROSTER_DERIVED'
     return complete_options(data, defaults)

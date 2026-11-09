@@ -16,11 +16,12 @@ Download `NBA.2K17.MyTEAM.zip`, choose **Extract All**, and run `2K17 MyTEAM.exe
 <tr><td><img src="docs/screenshots/super-budget-mode.png" alt="Super Budget draft mode"><br>Super Budget draft</td><td><img src="docs/screenshots/sapphire-round.png" alt="Sapphire bonus round"><br>Sapphire bonus round</td></tr>
 <tr><td><img src="docs/screenshots/blacktop-team.png" alt="Blacktop drafted team"><br>Blacktop teams and draft music</td><td><img src="docs/screenshots/blacktop-injection.png" alt="Blacktop injection ordered by overall"><br>Inject every Blacktop pick</td></tr>
 <tr><td><img src="docs/screenshots/blacktop-settings.png" alt="Blacktop team formats and roles"><br>Choose a Blacktop format and roles</td><td><img src="docs/screenshots/game-connection.png" alt="Game Connection"><br>Game Connection and optional hook</td></tr>
+<tr><td><img src="docs/screenshots/wingspan-studio.png" alt="Card Studio wingspan slider and length"><br>Edit wingspan with live measurements</td><td><img src="docs/screenshots/wingspan-information.png" alt="Wingspan in the archive Information tab"><br>View wingspan in centimeters and feet/inches</td></tr>
 </table>
 
 ## Included
 
-- 2,182 available cards in v1.3.0, including all currently saved custom cards.
+- 2,200 available cards in v1.5.0, including all currently saved custom cards.
 - Original PNG artwork, preserved byte-for-byte. ZIP compression is lossless.
 - Filters for tiers, teams, positions, themes, collections, overall, and custom cards.
 - Create a Team, Random Team, Draft a Team, and dedicated Blacktop modes.
@@ -32,6 +33,8 @@ Download `NBA.2K17.MyTEAM.zip`, choose **Extract All**, and run `2K17 MyTEAM.exe
 - Super Budget favors lower tiers and ends with a Sapphire round (98.889% Sapphire, with small chances of Ruby through Pink Diamond).
 - Draft choices show badge-tier counts and Open 3PT ratings, including final Diamond/Amethyst/Sapphire rounds.
 - Integrated Card Studio with editable ratings, tendencies, signatures, shoes, accessories, badges, and hot zones.
+- Editable wingspan below height, with a 0–100 slider and live centimeters and feet/inches. Hover over its mode selector to see both Original and Custom.
+- The archive Information tab displays saved wingspan lengths in centimeters and feet/inches.
 - Custom-card imports, disable/re-enable/remove controls, and editable teams and years.
 - Saved reusable player templates for injection, with preview, verification, and undo.
 - Game Connection page with optional hook setup, startup settings, and automatic live roster refresh.

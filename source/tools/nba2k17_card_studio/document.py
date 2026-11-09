@@ -102,6 +102,9 @@ class Document:
             from .option_defaults import complete_options
             complete_options(data)
         identity = data.setdefault('identity', {'values': {}, 'statuses': {}})
+        if identity['values'].get('wingspan_value') is not None:
+            from nba2k17_viewer.wingspan import slider_scale
+            slider_scale(identity['values']['wingspan_value'])
         for key, value in {
             'name': ' '.join(x for x in (self.spec['first_name'], self.spec['last_name']) if x),
             'first_name': self.spec['first_name'], 'last_name': self.spec['last_name'],

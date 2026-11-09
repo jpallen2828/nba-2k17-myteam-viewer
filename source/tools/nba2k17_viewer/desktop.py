@@ -309,7 +309,7 @@ def value_group(title, rows, *, ratings=False):
         field = text(label(key), wrap=True)
         row_layout.addWidget(field, 1)
         shown = 'Missing' if value is None else json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else str(value)
-        rating = text(shown, wrap=not ratings)
+        rating = text(shown, wrap=not ratings and key != 'wingspan')
         if ratings:
             rating.setStyleSheet(f'color: {rating_color(value)}; font-weight: 700;')
         rating.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -481,12 +481,13 @@ class CardDialog(QWidget):
         return scroll_widget(body)
 
     def _information(self, card):
+        from .wingspan import card_wingspan_text
         body = QWidget()
         layout = vertical(body, 8, 12)
         identity = card['identity']['values']
-        fields = ('name', 'overall', 'tier', 'primary_position', 'secondary_position', 'team', 'theme', 'collection', 'card_year', 'represented_season', 'height', 'weight', 'age', 'origin', 'jersey_number')
+        fields = ('name', 'overall', 'tier', 'primary_position', 'secondary_position', 'team', 'theme', 'collection', 'card_year', 'represented_season', 'height', 'wingspan', 'weight', 'age', 'origin', 'jersey_number')
         metadata = section_values(card, 'gameplay_metadata')
-        information = [(k, identity.get(k)) for k in fields]
+        information = [(k, card_wingspan_text(card) if k == 'wingspan' else identity.get(k)) for k in fields]
         information.append(('shooting_hand', metadata.get('dominant_hand')))
         layout.addWidget(value_group('Card information', information))
         available = [(k, v) for k, v in metadata.items() if v is not None and k != 'dominant_hand']

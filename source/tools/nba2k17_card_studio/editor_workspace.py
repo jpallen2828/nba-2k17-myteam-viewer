@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTabWidget, QScrollArea, QFrame, QGroupBox, QGridLayout, QFormLayout, QComboBox,
-    QCheckBox, QLineEdit, QSpinBox, QDoubleSpinBox, QCompleter, QMessageBox,
+    QCheckBox, QLineEdit, QSpinBox, QSlider, QDoubleSpinBox, QCompleter, QMessageBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView)
 from nba2k17_viewer.hot_zones import ZONE_NAMES
 
@@ -31,6 +31,24 @@ TENDENCY_GROUPS = [
     ('Passing / Usage','dish_to_open_man touches'),
     ('Post','post_up post_back_down post_aggressive_backdown post_face_up post_spin post_drive post_drop_step post_hop_step post_stepback_shot post_fade_left post_fade_right post_hook_left post_hook_right post_hop_shot post_shimmy_shot post_up_and_under roll_vs_pop shoot_from_post'),
     ('Passing / Defense','flashy_pass alley_oop_pass pass_interception take_charge on_ball_steal contest_shot block_shot foul hard_foul')]
+
+
+class WingspanModeCombo(QComboBox):
+    """Both choices fit in one hover-opened list, with keyboard access intact."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.addItems(['Original', 'Custom'])
+        self.setMinimumWidth(120)
+        self.setMaxVisibleItems(2)
+        self.setStyleSheet('QComboBox { combobox-popup: 0; } QComboBox QAbstractItemView::item { min-height: 28px; padding: 3px 8px; }')
+        self.view().setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.view().setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setAccessibleName('Wingspan mode')
+
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        if self.isEnabled() and not self.view().isVisible():
+            self.showPopup()
 
 
 class DataEditor(QWidget):
@@ -183,15 +201,67 @@ class DataEditor(QWidget):
         group=QGroupBox('Player Vitals');grid=QGridLayout(group)
         order=['primary_position','secondary_position','height','weight','height_cm','age','college','country','jersey_number']
         for i,key in enumerate(order):
-            grid.addWidget(QLabel(self.label('identity',key)),i//2,(i%2)*2)
-            grid.addWidget(self.visual(key) if key in ('primary_position','jersey_number') else self.control('identity',key),i//2,(i%2)*2+1)
+            row=i//2 + (1 if i>=4 else 0)
+            grid.addWidget(QLabel(self.label('identity',key)),row,(i%2)*2)
+            grid.addWidget(self.visual(key) if key in ('primary_position','jersey_number') else self.control('identity',key),row,(i%2)*2+1)
+        grid.addWidget(QLabel('Wingspan'),2,0)
+        grid.addWidget(self.wingspan_control(),2,1,1,3)
         layout.addWidget(group)
         self.grid_group(layout,'In-Game Vitals / Play Types','gameplay_metadata',self.keys('gameplay_metadata'),columns=2)
-        shown=set(order)|{'name','first_name','last_name','overall','tier','theme','card_year','collection','franchise'}
+        shown=set(order)|{'name','first_name','last_name','overall','tier','theme','card_year','collection','franchise','wingspan_value'}
         remaining=[k for k in self.keys('identity') if k not in shown]
         self.grid_group(layout,'Additional Recovered Vitals','identity',remaining,columns=2)
         note=QLabel('Hover a field for its source status. Your edits are marked CUSTOM_AUTHORED.\nPartially checked personality badges mean Unknown, not absent.')
         note.setWordWrap(True);note.setStyleSheet('color: #9fb0c5;');layout.addWidget(note);layout.addStretch(1)
+
+    def wingspan_control(self):
+        from nba2k17_viewer.wingspan import slider_scale
+        box=QWidget(); rows=QVBoxLayout(box); rows.setContentsMargins(0,0,0,0)
+        controls=QHBoxLayout(); rows.addLayout(controls)
+        self.wingspan_mode=WingspanModeCombo(); self.wingspan_mode.setObjectName('wingspanMode')
+        self.wingspan_slider=QSlider(Qt.Orientation.Horizontal); self.wingspan_slider.setObjectName('wingspanSlider')
+        self.wingspan_slider.setRange(0,100); self.wingspan_slider.setMinimumWidth(120)
+        self.wingspan_slider.setStyleSheet('QSlider::groove:horizontal { height: 2px; background: white; } QSlider::handle:horizontal { background: #35d7ff; width: 12px; margin: -5px 0; border-radius: 2px; } QSlider::handle:horizontal:disabled { background: #708090; }')
+        self.wingspan_spin=QSpinBox(); self.wingspan_spin.setObjectName('wingspanValue'); self.wingspan_spin.setRange(0,100)
+        self.wingspan_restore=QPushButton('Restore original')
+        for w in (self.wingspan_mode,self.wingspan_slider,self.wingspan_spin,self.wingspan_restore):controls.addWidget(w)
+        self.wingspan_length=QLabel(); self.wingspan_length.setObjectName('wingspanLength'); self.wingspan_length.setWordWrap(True)
+        self.wingspan_length.setStyleSheet('color: #35d7ff;'); rows.addWidget(self.wingspan_length)
+        value=self.document.data['identity']['values'].get('wingspan_value')
+        if value is not None:slider_scale(value)
+        self.wingspan_mode.setCurrentIndex(0 if value is None else 1)
+        self.wingspan_slider.setValue(50 if value is None else value); self.wingspan_spin.setValue(self.wingspan_slider.value())
+        box.setToolTip('Original preserves the captured source length. Custom uses height × 1.0544021 × (0.9 + 0.002 × value), calibrated with standard body proportions. Changing height updates the custom length. A custom 50 can differ from the original length.')
+        self.wingspan_mode.currentIndexChanged.connect(self.commit_wingspan)
+        self.wingspan_slider.valueChanged.connect(self.wingspan_spin.setValue)
+        self.wingspan_spin.valueChanged.connect(self.wingspan_slider.setValue)
+        self.wingspan_spin.valueChanged.connect(self.commit_wingspan)
+        self.wingspan_restore.clicked.connect(lambda:self.wingspan_mode.setCurrentIndex(0))
+        self.refresh_wingspan()
+        return box
+
+    def commit_wingspan(self, *_):
+        identity=self.document.data['identity']
+        if self.wingspan_mode.currentIndex()==1:
+            identity['values']['wingspan_value']=self.wingspan_spin.value()
+            identity['statuses']['wingspan_value']='CUSTOM_AUTHORED'
+        else:
+            identity['values'].pop('wingspan_value',None)
+            identity['statuses'].pop('wingspan_value',None)
+        self.refresh_wingspan()
+
+    def refresh_wingspan(self):
+        from nba2k17_viewer.wingspan import custom_length, format_length
+        from .overall_calculator import document_height
+        custom=self.wingspan_mode.currentIndex()==1
+        self.wingspan_slider.setEnabled(custom); self.wingspan_spin.setEnabled(custom)
+        self.wingspan_restore.setEnabled(custom)
+        identity=self.document.data['identity']
+        try:
+            cm=custom_length(document_height(identity),self.wingspan_spin.value()) if custom else identity['values'].get('source_wingspan_cm')
+            self.wingspan_length.setText(format_length(cm))
+        except ValueError as exc:
+            self.wingspan_length.setText(str(exc))
 
     def visual(self,key):
         spec_key={'name':None,'primary_position':'position'}.get(key,key)
@@ -398,6 +468,7 @@ class DataEditor(QWidget):
             if widget is not None:
                 widget.setText('' if converted is None else str(converted))
                 self.refresh_tooltip('identity',other)
+            self.refresh_wingspan()
         if section=='attributes' or (section=='identity' and key in ('height','height_cm')):
             self.update_overall()
 

@@ -18,6 +18,7 @@ from scanner.injection_metrics import Metrics, measured
 
 from nba2k17_scraper.injection_exporter import resolve_player_values, OVERRIDE_SECTIONS
 from .roster_source_matching import player_key
+from .wingspan import custom_length, slider_scale, has_custom_wingspan, needs_full_body
 
 
 from .runtime_fields import runtime_definition
@@ -587,13 +588,23 @@ class RosterSession:
             if height is not None and abs(precise - height) > 1: raise ValueError('Conflicting card height measurements.')
             height = precise
         wingspan = stored.get('appearance', {}).get('wingspan_cm')
-        if height is None or wingspan is None or not 120 <= height <= 260 or not 120 <= wingspan <= 300:
+        custom = has_custom_wingspan(plan)
+        if custom:
+            wingspan = custom_length(height, identity['wingspan_value'])
+        if height is None or wingspan is None or not 120 <= height <= 260 or (not custom and not 120 <= wingspan <= 300):
             raise ValueError('Missing or invalid captured height/wingspan.')
         measurements = struct.pack('<ff', height, wingspan)
         source = plan.get('native_sculpt_appearance')
-        if not source:
+        if not source and not custom:
             return measurements
-        desired = bytearray(measurements + bytes.fromhex(source['body_hex'])[8:])
+        # Custom regular faces change only the two measurements and the scale.
+        # Unrelated body proportions always come from the destination snapshot.
+        base = bytes.fromhex(source['body_hex']) if source else (before if before is not None else bytes(132))
+        if len(base) != 132:
+            raise ValueError('Invalid destination appearance extent')
+        desired = bytearray(measurements + base[8:])
+        if custom:
+            struct.pack_into('<f', desired, 0x60, slider_scale(identity['wingspan_value']))
         # Native reflection defines only bits 0..29 of the final packed word.
         # Its initializer preserves the two remaining bits; so do we.
         if before is not None:
@@ -654,8 +665,8 @@ class RosterSession:
                 if before != desired:
                     if self.body_owner_index[body] != [ptr]: raise ValueError('Destination body storage is shared.')
                     changed += 1
-                    cache = self.appearance_cache if source else self.body_cache
-                    missing_group = missing_appearances if source else missing
+                    cache = self.appearance_cache if needs_full_body(plan) else self.body_cache
+                    missing_group = missing_appearances if needs_full_body(plan) else missing
                     if live:
                         try: cache.require(body, ptr)
                         except ValueError as exc: missing_group.append(body); reasons.append(label + ': ' + str(exc))
@@ -820,44 +831,53 @@ class RosterSession:
                     plan['body']={'height_cm':struct.unpack('<f',desired[:4])[0],
                         'wingspan_cm':struct.unpack('<f',desired[4:8])[0],
                         'region':'body:'+hex(body),'address':body,'after_hex':desired.hex()}
-                    plan['unsupported']=[g for g in plan['unsupported'] if g['field'] not in ('identity.height','identity.height_cm')]
+                    if has_custom_wingspan(plan):
+                        plan['body'].update(wingspan_value=plan['resolved']['values']['identity']['wingspan_value'],
+                                            wingspan_scale=struct.unpack_from('<f', desired, 0x60)[0],
+                                            wingspan_policy='Custom height-based length; standard-proportion calibration')
+                    else:
+                        plan['body']['wingspan_policy'] = 'Original captured source length'
+                    plan['unsupported']=[g for g in plan['unsupported'] if g['field'] not in ('identity.height','identity.height_cm','identity.wingspan_value')]
                     continue
             bodies[body] = (ptr, profile, plan)
         # Unchanged linked blocks are read back but never written; they need
         # no all-memory ownership proof. Changed blocks keep that proof.
         changed_bodies = {}
         for body, (ptr, profile, plan) in bodies.items():
-            stored = profile['reusable_roster_template']['defaults']
-            identity = plan['resolved']['values'].get('identity', {})
-            height = identity.get('height_cm', stored.get('identity', {}).get('height_cm'))
-            inches = re.match(r"^(\d+)'(\d+)\"", str(identity.get('height', '')))
-            if inches:
-                precise = (int(inches[1]) * 12 + int(inches[2])) * 2.54
-                if height is not None and abs(precise - height) > 1:
-                    raise ValueError('Conflicting card height measurements.')
-                height = precise
-            wingspan = stored.get('appearance', {}).get('wingspan_cm')
-            if height is None or wingspan is None or not 120 <= height <= 260 or not 120 <= wingspan <= 300:
-                raise ValueError('Missing or invalid captured height/wingspan.')
             after = self.desired_body(profile, plan)
             before = self.reader.read_or_raise(body, len(after))
             after = self.desired_body(profile, plan, before)
             key = 'body:' + hex(body)
             self.extra_regions.append(Region(key, body, before))
             if before != after:
-                fields = 'identity.height_cm,appearance.wingspan_cm' + (',appearance.native_body' if len(after) == 132 else '')
-                self.patches.append(Patch(key, 0, before, after, fields, evidence_hash))
+                fields = 'identity.height_cm,appearance.wingspan_cm'
+                if plan.get('native_sculpt_appearance'):
+                    fields += ',appearance.native_body'
+                    if has_custom_wingspan(plan): fields += ',identity.wingspan_value,appearance.wingspan_scale'
+                    self.patches.append(Patch(key, 0, before, after, fields, evidence_hash))
+                else:
+                    if before[:8] != after[:8]:
+                        self.patches.append(Patch(key, 0, before[:8], after[:8], fields, evidence_hash))
+                    if has_custom_wingspan(plan) and before[0x60:0x64] != after[0x60:0x64]:
+                        self.patches.append(Patch(key, 0x60, before[0x60:0x64], after[0x60:0x64],
+                                                  'identity.wingspan_value,appearance.wingspan_scale', evidence_hash))
                 changed_bodies[body] = (ptr, plan)
             plan['body'] = {'height_cm': struct.unpack('<f', after[:4])[0], 'wingspan_cm': struct.unpack('<f', after[4:8])[0],
                             'region': key, 'address': body, 'after_hex': after.hex()}
-            plan['unsupported'] = [g for g in plan['unsupported'] if g['field'] not in ('identity.height', 'identity.height_cm')]
+            if has_custom_wingspan(plan):
+                plan['body'].update(wingspan_value=plan['resolved']['values']['identity']['wingspan_value'],
+                                    wingspan_scale=struct.unpack_from('<f', after, 0x60)[0],
+                                    wingspan_policy='Custom height-based length; standard-proportion calibration')
+            else:
+                plan['body']['wingspan_policy'] = 'Original captured source length'
+            plan['unsupported'] = [g for g in plan['unsupported'] if g['field'] not in ('identity.height', 'identity.height_cm', 'identity.wingspan_value')]
         for body, (ptr, plan) in changed_bodies.items():
             try:
-                cache = self.appearance_cache if plan.get('native_sculpt_appearance') else self.body_cache
+                cache = self.appearance_cache if needs_full_body(plan) else self.body_cache
                 self.extra_regions.extend(cache.require(body, ptr))
             except ValueError as exc:
                 raise ValueError(plan['destination']['name'] + ': ' + str(exc)) from exc
-        self.body_ownership = {'bodies': [(self.appearance_cache if p.get('native_sculpt_appearance') else self.body_cache).describe(b)
+        self.body_ownership = {'bodies': [(self.appearance_cache if needs_full_body(p) else self.body_cache).describe(b)
                                         for b, (_, p) in changed_bodies.items()],
                                'read_bytes': 0, 'exhaustive_scan_performed': False,
                                'targeted_validation_performed': True,
@@ -896,6 +916,7 @@ class RosterSession:
 
     @measured('linked_reference_checks')
     def validate_patch(self, patch, regions=None):
+        all_regions = self.transaction_regions if regions is None else regions
         if getattr(self, 'blacktop_binding', None):
             selected = blacktop_selection(self.reader, self.module_base, self.teams)
             if selected['team_key'] != self.blacktop_binding['team_key']:
@@ -936,7 +957,8 @@ class RosterSession:
         owners = self.body_owner_index.get(body, [])
         if len(owners) != 1:
             raise ValueError('Linked body ownership is ambiguous; no body write or rollback was performed.')
-        cache = self.appearance_cache if len(patch.after) == 132 else self.body_cache
+        extent = next(r for r in all_regions if r.name == patch.region)
+        cache = self.appearance_cache if len(extent.before) == 132 else self.body_cache
         cache.require(body, owners[0])
 
     def save_failure(self, message):
@@ -994,6 +1016,12 @@ class RosterSession:
                                    'expected': f['decoded_after'], 'matches': value == f['decoded_after']})
                 if actual[plan['body']['region']].hex() != plan['body']['after_hex']:
                     raise ValueError('Linked body readback failed.')
+                body_data = actual[plan['body']['region']]
+                for field, offset in (('height_cm', 0), ('wingspan_cm', 4), ('wingspan_scale', 0x60)):
+                    if field not in plan['body']: continue
+                    value = struct.unpack_from('<f', body_data, offset)[0]
+                    checks.append({'card': plan['card_identity'], 'field': 'appearance.' + field,
+                                   'actual': value, 'expected': plan['body'][field], 'matches': value == plan['body'][field]})
                 if plan.get('sculpt'):
                     if actual[plan['sculpt']['region']].hex() != plan['sculpt']['after_hex']:
                         raise ValueError('Linked facial sculpt readback failed.')

@@ -701,7 +701,7 @@ class RosterSession:
         return [candidates[i] for i in assignment]
 
     @measured('profile_preparation')
-    def prepare(self, profiles, team_key, *, slots=None):
+    def prepare(self, profiles, team_key, *, slots=None, allow_reader_repair=False):
         from scanner.injection_transaction import Patch, Region
         from scanner.college_lookup import resolve_optional_college
         if getattr(self, 'live_mode', 'roster') == 'blacktop':
@@ -808,6 +808,11 @@ class RosterSession:
         if any(p.get('name_presentation', {}).get('hook_face_id_matches') is False for p in self.plans):
             self.prepared_report['remaining_limits'].append(
                 'A Shai card uses a different face ID from the verified name companion profile; full-name menu presentation is not verified for that card.')
+        from .custom_face_loader import check_injection
+        self.prepared_report['custom_face_loader'] = check_injection(
+            self.reader, self.plans, allow_reader_repair=allow_reader_repair)
+        if self.prepared_report['custom_face_loader']['state'] in ('unverified', 'needs_repair'):
+            self.prepared_report['remaining_limits'].append(self.prepared_report['custom_face_loader']['message'])
         return self.prepared_report
 
     @measured('ownership')
@@ -990,6 +995,15 @@ class RosterSession:
     def write(self, output=None, *, restore_after=False):
         from scanner.injection_transaction import execute, WindowsMemoryWriter, Region, Patch
         from scanner.player_codec import decode
+        from .custom_face_loader import check_injection
+        self.validate()
+        if self.prepared_report.get('custom_face_loader', {}).get('state') == 'needs_repair':
+            from .custom_face_runtime import ensure_custom_reader
+            ensure_custom_reader(self.reader, self.plans,
+                                 journal_path=injection_workspace() / ('custom-face-reader-' + uuid.uuid4().hex + '.json'),
+                                 progress=self.progress)
+            self.validate()
+        self.prepared_report['custom_face_loader'] = check_injection(self.reader, self.plans)
         output = Path(output) if output else injection_workspace() / ('run-' + uuid.uuid4().hex)
         output.mkdir(parents=True, exist_ok=False)
         def save(name, data):

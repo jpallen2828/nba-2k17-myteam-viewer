@@ -100,6 +100,7 @@ class ViewerFilter:
 class ArchiveRepository:
     def __init__(self, path: Path | str, *, badge_overlay=None):
         self.path = Path(path).resolve()
+        self._image_dependencies = set()
         if badge_overlay is None:
             data_root = next((p for p in self.path.parents if p.name == 'nba2k17' and p.parent.name == 'data'), None)
             if data_root is not None:
@@ -208,6 +209,7 @@ class ArchiveRepository:
         if not path:
             return None
         candidate = Path(path)
+        self._image_dependencies.add(str(candidate.resolve()))
         if candidate.is_file():
             return str(candidate)
         # Permit moving the whole workspace without rewriting audited paths.
@@ -215,6 +217,7 @@ class ArchiveRepository:
         marker = "/.project/"
         if marker in portable:
             candidate = project_root() / ".project" / portable.split(marker, 1)[1]
+            self._image_dependencies.add(str(candidate.resolve()))
             if candidate.is_file():
                 return str(candidate)
         return None

@@ -1,0 +1,62 @@
+{
+  "format": "nba2k17-mod-face-requirements/v1",
+  "evidence": "2026-11-14 audit of user-installed face/png pairs and persisted custom-card imports. These IDs describe external assets, not native Face ID 1 sculpt sources.",
+  "faces": {
+    "7504": {
+      "player": "Jayson Tatum",
+      "files": [
+        "face7504.iff",
+        "png7504.iff"
+      ]
+    },
+    "7510": {
+      "player": "Donovan Mitchell",
+      "files": [
+        "face7510.iff",
+        "png7510.iff"
+      ]
+    },
+    "7702": {
+      "player": "Luka Doncic",
+      "files": [
+        "face7702.iff",
+        "png7702.iff"
+      ]
+    },
+    "7710": {
+      "player": "Shai Gilgeous-Alexander",
+      "files": [
+        "face7710.iff",
+        "png7710.iff"
+      ]
+    },
+    "8001": {
+      "player": "Tyrese Haliburton",
+      "files": [
+        "face8001.iff",
+        "png8001.iff"
+      ]
+    },
+    "8033": {
+      "player": "Victor Wembanyama",
+      "files": [
+        "face8033.iff",
+        "png8033.iff"
+      ]
+    },
+    "8569": {
+      "player": "Darrell Griffith",
+      "files": [
+        "face8569.iff",
+        "png8569.iff"
+      ]
+    },
+    "8672": {
+      "player": "Dino Radja",
+      "files": [
+        "face8672.iff",
+        "png8672.iff"
+      ]
+    }
+  }
+}

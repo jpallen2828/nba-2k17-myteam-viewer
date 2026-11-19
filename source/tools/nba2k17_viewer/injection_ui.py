@@ -236,6 +236,8 @@ class InjectionPanel(QFrame):
         if self.connection is not None:
             self.connection.snapshot_changed.connect(self.connection_snapshot)
             self.connection.activity_changed.connect(self.connection_activity)
+            if hasattr(self.connection, "pause_for_injection"):
+                self.connection.pause_for_injection()
             if not blacktop and not self.connection.roster_file and self.session_matches_selection():
                 existing_path = str(getattr(self.session, 'roster_file', '') or '')
                 if existing_path:
@@ -280,7 +282,11 @@ class InjectionPanel(QFrame):
 
     def release(self):
 
+        if self.released:
+            return
         self.released = True
+        if self.connection is not None and hasattr(self.connection, "resume_after_injection"):
+            self.connection.resume_after_injection()
 
         if self.busy:
             self.manager.cancel()
@@ -321,6 +327,10 @@ class InjectionPanel(QFrame):
         if not active and self._pending_connection_snapshot is not None:
             snapshot, self._pending_connection_snapshot = self._pending_connection_snapshot, None
             self.connection_snapshot(snapshot)
+        if not active and not self.busy and not self.manager.busy and self._display_session is None:
+            self.filter_teams()
+            if self.status.text().startswith("Waiting for the background connection check"):
+                self.status.setText("Click Scan Blacktop to detect the selected live team." if self.blacktop else "Click Scan live roster to use the selected roster file.")
         self.update_controls()
 
 
@@ -770,7 +780,7 @@ class InjectionPanel(QFrame):
 
             session.begin_operation()
 
-            return session.prepare(self.profiles, key, slots=slots)
+            return session.prepare(self.profiles, key, slots=slots, allow_reader_repair=True)
 
         def done(report):
 
@@ -850,7 +860,7 @@ class InjectionPanel(QFrame):
 
                 raise ValueError('Injection cancelled before any game data was written.')
 
-            report = session.prepare(self.profiles, key, slots=slots)
+            report = session.prepare(self.profiles, key, slots=slots, allow_reader_repair=True)
 
             self.manager.begin_write()
 
@@ -893,13 +903,16 @@ class InjectionPanel(QFrame):
         if self.blacktop:
             self.directory.setEnabled(False); self.browse.setEnabled(False); self.find_button.setEnabled(False)
             self.roster.setEnabled(False); self.kind.setEnabled(False)
+        self.close_button.setEnabled(not self.busy and not self.manager.writing)
+        if self.connection_busy() and not self.busy and self.table.rowCount() == 0:
+            self.status.setText("Waiting for the background connection check to finish. You can return to the lineup.")
         self.scan_button.setEnabled(not busy and (self.blacktop or bool(self.roster.currentData())))
 
         self.scan_button.setText('Scanning…' if self.busy and self.session is None else ('Scan Blacktop' if self.blacktop else 'Scan live roster'))
 
         if hasattr(self, 'prepare_button'):
 
-            self.cancel_button.setEnabled(self.busy and not self.manager.writing)
+            self.cancel_button.setEnabled((self.busy or self.manager.busy) and not self.manager.writing)
 
             self.prepare_button.setEnabled(self.can_inject())
 

@@ -12,16 +12,16 @@ def autosave_directory(kind):
 
 
 class DraftAutosave:
-    def __init__(self, kind):
+    def __init__(self, kind, *, path=None):
         self.kind = kind
-        self.path = None
+        self.path = Path(path) if path is not None else None
 
     def save(self, session):
         if not session.selected and not session.pending:
             return self.path
-        directory = autosave_directory(self.kind)
-        directory.mkdir(parents=True, exist_ok=True)
         if self.path is None:
+            directory = autosave_directory(self.kind)
+            directory.mkdir(parents=True, exist_ok=True)
             self.path = directory / f'{self.kind}-{datetime.now():%Y%m%d-%H%M%S}-{uuid4().hex[:12]}.2k17team'
         session.save(self.path)
         return self.path

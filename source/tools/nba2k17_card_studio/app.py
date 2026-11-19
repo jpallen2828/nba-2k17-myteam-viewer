@@ -93,18 +93,19 @@ def run_smoke(window,report,check_background=False):
         result['promotions_alphabetical']=True
         assert [window.logo_category.itemText(i) for i in range(window.logo_category.count())]==['Current']
         logo_names=[window.logo.itemText(i) for i in range(1,window.logo.count())]
-        assert len(logo_names)==34 and len(set(logo_names))==34
+        assert len(logo_names)==36 and len(set(logo_names))==36
         assert 'Charlotte Hornets' in logo_names[:-3]
         assert 'Seattle SuperSonics' in logo_names[:-3]
         assert logo_names[:-3]==sorted(logo_names[:-3],key=str.casefold)
         assert logo_names[-3:]==['Eastern Conference','Team USA','Western Conference']
-        for name in logo_names[-3:]:
+        for name in [*logo_names[-3:], 'USA Basketball', 'Dream Team']:
             window.logo.setCurrentIndex(window.logo.findText(name))
             assert window.doc.spec['team_logo']==window.logo.currentData()
             _,layers=render_card(window.pack,window.doc.render_spec(),return_layers=True)
             assert layers['team_logo'].getbbox()
         result['current_logo_set']={'nba_teams':31,'nba_teams_alphabetical':True,
-            'extras':logo_names[-3:],'charlotte_hornets':True,'other_sets_hidden':True}
+            'extras':[*logo_names[-3:], 'USA Basketball', 'Dream Team'],
+            'charlotte_hornets':True,'other_sets_hidden':True}
         result['editor_tabs']=[editor.tabs.tabText(i) for i in range(editor.tabs.count())]
         editor.fields[('attributes','speed')].setValue(91)
         editor.fields[('badges','catch_and_shoot')].setCurrentIndex(editor.fields[('badges','catch_and_shoot')].findData('HALL_OF_FAME'))

@@ -148,3 +148,29 @@ def test_autosave_failure_is_visible(rows,tmp_path,monkeypatch):
     w.open_pack(w.session.regular_keys[0])
     assert 'Auto-save failed' in w.autosave_note.text() and 'disk full' in w.autosave_note.text()
     owner.close_overlay();owner.pages.close();owner.pages.deleteLater();app.processEvents()
+
+
+def test_loading_blacktop_reuses_save_without_writing_or_duplicating(rows,tmp_path,monkeypatch):
+    from nba2k17_viewer import team_ui
+    app,w,owner=workspace(rows,tmp_path,monkeypatch)
+    s=BlacktopDraftSession(rows)
+    key=s.regular_keys[0]
+    s.open_pack(key)
+    path=DraftAutosave('blacktop').save(s)
+    original=path.read_bytes();stamp=path.stat().st_mtime_ns
+    monkeypatch.setattr(team_ui.QFileDialog,'getOpenFileName',lambda *a,**k:(str(path),''))
+    monkeypatch.setattr(team_ui.QMessageBox,'question',lambda *a,**k:team_ui.QMessageBox.StandardButton.Yes)
+    for _ in range(3):
+        w.load()
+        assert w.autosave.path==path
+        assert w.session.pending==key
+        assert path.read_bytes()==original and path.stat().st_mtime_ns==stamp
+        assert list(tmp_path.rglob('*.2k17team'))==[path]
+    w.pick(w.session.options[0])
+    assert list(tmp_path.rglob('*.2k17team'))==[path]
+    assert BlacktopDraftSession.load(rows,path).selected==w.session.selected
+    w.reset()
+    w.open_pack(w.session.regular_keys[0])
+    assert w.autosave.path!=path
+    assert len(list(tmp_path.rglob('*.2k17team')))==2
+    owner.close_overlay();owner.pages.close();owner.pages.deleteLater();app.processEvents()

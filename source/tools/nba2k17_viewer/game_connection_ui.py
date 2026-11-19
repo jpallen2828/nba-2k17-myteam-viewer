@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, Q
 
 from . import game_hook
 from .hook_roster_sync import sync_roster
+from .roster_injection import select_roster_process
+from .runtime_fields import runtime_definition
 
 
 HOOK_DEPENDENCY_URL = 'https://forums.nba-live.com/downloads.php?view=detail&df_id=8772'
@@ -38,6 +40,9 @@ def hook_setup_guidance(installation, process=None):
                 'dependencies or restarting will not fix that mismatch. A compatible hook '
                 'is required. The app checks live roster access separately.')
     if process and process.get('hook_verified'):
+        reader = process.get('custom_face_reader') or {}
+        if reader.get('state') in ('inactive', 'missing', 'broken', 'unverified'):
+            return reader['message']
         return ('The verified hook DLL is loaded. Saved settings take effect at the next '
                 'game launch; use the startup diagnostics to check which features applied.')
     dependencies = installation.get('dependencies') or {}
@@ -65,8 +70,9 @@ def collect_snapshot(manager, game_dir, roster_file, *, synchronize=True,
     """Keep discovery separate from roster writes and feature-activation claims."""
     probe = game_hook.probe_processes()
     processes = probe['processes']
-    if not game_dir and len(processes) == 1 and processes[0].get('game_dir'):
-        game_dir = processes[0]['game_dir']
+    directories = {Path(p['game_dir']).resolve() for p in processes if p.get('game_dir')}
+    if not game_dir and processes and len(directories) == 1 and all(p.get('game_dir') for p in processes):
+        game_dir = str(next(iter(directories)))
     matches = [p for p in processes if game_dir and p.get('game_dir')
                and Path(p['game_dir']).resolve() == Path(game_dir).resolve()]
     process = matches[0] if len(matches) == 1 else None
@@ -77,8 +83,25 @@ def collect_snapshot(manager, game_dir, roster_file, *, synchronize=True,
         except (OSError, ValueError) as exc:
             inspection_error = str(exc)
     error = probe.get('error')
-    if not error and (len(matches) > 1 or (not game_dir and len(processes) > 1)):
-        error = 'Multiple game processes found. Close the extra game instance before connecting.'
+    if not error and len(matches) > 1:
+        # A same-named background process can outlive the actual game. Reuse
+        # injection's bounded read-only checks instead of selecting by age,
+        # window title or an arbitrary PID. Ambiguous loaded games stay blocked.
+        pids = [p.get('pid') for p in matches]
+        if (any(p.get('error') or p.get('supported') is not True for p in matches)
+                or any(not isinstance(p.get('token'), str) or not p['token'] for p in matches)
+                or any(type(pid) is not int or pid <= 0 for pid in pids)
+                or len(set(pids)) != len(pids)):
+            error = 'Multiple game processes found; their identities could not all be verified.'
+        else:
+            try:
+                pid = select_roster_process([(p['pid'], p.get('name', 'NBA2K17.exe'))
+                                             for p in matches], runtime_definition())
+                process = next(p for p in matches if p['pid'] == pid)
+            except (OSError, ValueError, RuntimeError, StopIteration) as exc:
+                error = str(exc) or 'The loaded game process could not be identified.'
+    if not error and not game_dir and len(processes) > 1:
+        error = 'Multiple game folders found. Select the game folder before connecting.'
     if not error and processes and not matches:
         error = 'The running game does not match the selected game folder.'
     if process and process.get('error'):
@@ -108,15 +131,31 @@ class _Signals(QObject):
 
 
 class _Job(QRunnable):
-    def __init__(self, function):
+    def __init__(self, function, *, timeout=30):
         super().__init__()
         self.function, self.signals = function, _Signals()
+        import frida
+        self.cancellation = frida.Cancellable()
+        self.timeout = timeout
+
+    def cancel_pending(self):
+        # Cancels only this connection worker's Frida operations, never an
+        # injection transaction or the game's own threads.
+        self.cancellation.cancel()
 
     def run(self):
+        from threading import Timer
+        deadline = Timer(self.timeout, self.cancel_pending)
+        deadline.daemon = True
+        deadline.start()
         try:
-            self.signals.done.emit(self.function())
+            with self.cancellation:
+                result = self.function()
+            self.signals.done.emit(result)
         except Exception as exc:
             self.signals.error.emit(str(exc))
+        finally:
+            deadline.cancel()
 
 
 class GameConnectionController(QObject):
@@ -137,7 +176,9 @@ class GameConnectionController(QObject):
         self.name_companion = NamePresentationController()
         self.snapshot = {}
         self.active, self.closing, self.job = False, False, None
+        self._cleanup_started = False
         self._generation = 0
+        self._injection_views = 0
         self._retry_after = 0.0
         self._followup = False
         self._manual_followup = False
@@ -147,6 +188,18 @@ class GameConnectionController(QObject):
         if autostart and os.environ.get('NBA2K17_DISABLE_GAME_MONITOR') != '1':
             self.timer.start()
             QTimer.singleShot(1500, self._tick)
+
+    def pause_for_injection(self):
+        self._injection_views += 1
+        self._generation += 1
+        # Cooperative cancellation only; never release another worker's lock.
+        if self.active and self.manager.busy and not self.manager.writing:
+            self.manager.cancel()
+
+    def resume_after_injection(self):
+        self._injection_views = max(0, self._injection_views - 1)
+        if not self._injection_views and not self.closing and self.timer.isActive():
+            self.refresh(force=True)
 
     def _tick(self):
         if monotonic() >= self._retry_after:
@@ -180,12 +233,12 @@ class GameConnectionController(QObject):
         self._generation += 1
         self.refresh(force=True)
 
-    def _start(self, function, completed):
-        if self.active or self.closing:
+    def _start(self, function, completed, *, shutdown_cleanup=False):
+        if self.active or (self.closing and not shutdown_cleanup):
             return False
         self.active = True
         self.activity_changed.emit(True)
-        self.job = _Job(function)
+        self.job = _Job(function, timeout=5 if shutdown_cleanup else 30)
         self._completed = completed
         self.job.signals.done.connect(self._done, Qt.ConnectionType.QueuedConnection)
         self.job.signals.error.connect(self._error, Qt.ConnectionType.QueuedConnection)
@@ -193,7 +246,7 @@ class GameConnectionController(QObject):
         return True
 
     def refresh(self, *, force=False, refresh_roster=False):
-        if self.closing:
+        if self.closing or self._injection_views:
             return
         if self.active or self.manager.busy:
             self._followup = self._followup or force
@@ -258,8 +311,9 @@ class GameConnectionController(QObject):
     def _finish(self):
         self.active, self.job = False, None
         self._completed = None
-        if self.closing:
-            self.name_companion.close()
+        if self.closing and not self._cleanup_started:
+            self._start_cleanup()
+            return
         self.activity_changed.emit(False)
         self.idle.emit()
         if self._followup and not self.closing:
@@ -271,9 +325,15 @@ class GameConnectionController(QObject):
         self.timer.stop()
         if self.active:
             self.manager.cancel()
-        else:
-            self.name_companion.close()
+            if not self._cleanup_started and self.job is not None:
+                self.job.cancel_pending()
+        elif not self._cleanup_started:
+            self._start_cleanup()
         return not self.active
+
+    def _start_cleanup(self):
+        self._cleanup_started = True
+        self._start(self.name_companion.close, lambda _: None, shutdown_cleanup=True)
 
 
 def _label(value, style=None):
@@ -478,7 +538,15 @@ class GameConnectionPage(QWidget):
             if _hook_unsupported(installation, process):
                 hook = 'Bundled hook does not support this game build'
             elif process.get('hook_verified'):
-                hook = 'Verified hook DLL loaded'
+                reader = process.get('custom_face_reader') or {}
+                if reader.get('state') in ('inactive', 'missing'):
+                    hook = 'Hook loaded · custom-face reader inactive'
+                elif reader.get('state') == 'broken':
+                    hook = 'Hook loaded · custom-face reader needs repair'
+                elif reader.get('state') == 'unverified':
+                    hook = 'Hook loaded · custom-face reader unverified'
+                else:
+                    hook = 'Verified hook DLL loaded'
             elif process.get('hook_loaded'):
                 hook = 'Unrecognized hook DLL loaded'
             elif installation.get('ready'):

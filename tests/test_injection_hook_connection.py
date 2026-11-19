@@ -193,3 +193,31 @@ def test_missing_selected_file_clears_confirmation_instead_of_guessing_another(t
     assert connection.roster_file == ''
     assert panel.session is None and not panel.can_inject()
     panel.release(); panel.manager.shutdown()
+
+
+def test_blacktop_opened_during_background_scan_recovers_controls(tmp_path, monkeypatch):
+    app, old_panel, connection, path = panel_fixture(tmp_path, monkeypatch)
+    owner=old_panel.owner
+    old_panel.release()
+    connection.active=True
+    owner.injection_manager.reserve()
+    paused=[]
+    connection.pause_for_injection=lambda: (paused.append(True), owner.injection_manager.cancel())
+    resumed=[]
+    connection.resume_after_injection=lambda: resumed.append(True)
+    panel=injection_ui.InjectionPanel(owner, [(0, {'id':'card'})], blacktop=True)
+    assert paused and owner.injection_manager.cancel_event.is_set()
+    assert not panel.scan_button.isEnabled()
+    assert panel.close_button.isEnabled() and panel.cancel_button.isEnabled()
+    try:
+        owner.injection_manager.run(lambda _: None, lambda _: None)
+    except ValueError:
+        pass
+    connection.activity(False)
+    assert panel.scan_button.isEnabled()
+    assert panel.table.rowCount()==1
+    assert panel.status.text().startswith("Click Scan Blacktop")
+    assert not panel.inject_button.isEnabled()
+    panel.release(); panel.release()
+    assert resumed==[True]
+    owner.injection_manager.shutdown()

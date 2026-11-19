@@ -71,6 +71,7 @@ def test_each_patch_checks_blacktop_team_before_touching_destination():
     s=BlacktopSession.__new__(BlacktopSession)
     s.reader=Roots();s.module_base=0;s.teams=teams()
     s.blacktop_binding={'team_key':'different'}
+    s.transaction_regions=()
     with pytest.raises(ValueError,match='Blacktop team changed before destination write'):
         s.validate_patch(SimpleNamespace(region='player:0x64'))
 

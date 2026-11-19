@@ -4,7 +4,7 @@ Browse the NBA 2K17 card archive, create custom cards, draft or build teams, and
 
 **[Download the Windows release](https://github.com/jpallen2828/nba-2k17-myteam-viewer/releases/latest)**
 
-Download `NBA.2K17.MyTEAM.zip`, choose **Extract All**, and run `2K17 MyTEAM.exe` from the extracted folder. Keep the included `.project` data folder beside the EXE. No Python installation is needed.
+Download `NBA.2K17.MyTEAM.zip`, choose **Extract All**, and run `2K17 MyTEAM.exe` from the extracted folder. Keep the included `.project` data folder and `_myteam_runtime` folder beside the EXE. No Python installation is needed.
 
 ## Screenshots
 
@@ -89,7 +89,7 @@ py -3.13 -m pip install -r requirements.txt
 py -3.13 tools/build_release.py --resources "C:\path\to\NBA 2K17 Build Resources"
 ```
 
-The built EXE appears in `dist`. To run it, place it in an extracted MyTEAM release folder alongside the supplied database and artwork. The source repository does not contain those large release datasets.
+The build appears in `dist/2K17 MyTEAM`. Copy both its EXE and `_myteam_runtime` folder into an extracted MyTEAM release folder alongside the supplied database and artwork. Keeping the runtime unpacked avoids extracting it on every launch. A disposable local startup cache refreshes when the catalog, custom imports, curation, artwork, or app changes; the first launch after those changes takes longer. The source repository does not contain those large release datasets.
 
 ## Support
 

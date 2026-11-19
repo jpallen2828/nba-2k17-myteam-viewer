@@ -395,6 +395,12 @@ def probe_processes():
                     if name == 'nba2k_hook.dll':
                         item['hook_loaded'] = True
                         item['hook_verified'] = module_info['payload_match']
+                if item['supported'] and item['hook_verified']:
+                    try:
+                        from .custom_face_loader import inspect_loader
+                        item['custom_face_reader'] = inspect_loader(reader)
+                    except (OSError, ValueError, RuntimeError, AttributeError) as exc:
+                        item['custom_face_reader'] = {'state': 'unverified', 'message': str(exc)}
                 if process_token(reader) != item['token']:
                     raise ValueError('Game process changed during the check.')
         except (OSError, ValueError, RuntimeError) as exc:

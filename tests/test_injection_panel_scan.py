@@ -124,7 +124,7 @@ class WritableSession(Session):
     def begin_operation(self):
         self.calls.append('begin_operation')
 
-    def prepare(self, profiles, key, *, slots):
+    def prepare(self, profiles, key, *, slots, allow_reader_repair=False):
         self.calls.append(('prepare', key, slots))
         if None in slots:
             raise ValueError('Selected slot is unavailable')

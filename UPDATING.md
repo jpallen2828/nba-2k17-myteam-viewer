@@ -1,6 +1,6 @@
 # Updating without losing your cards
 
-For the first installation, extract the entire ZIP into a writable folder and run the EXE. Keep `.project` beside it.
+For the first installation, extract the entire ZIP into a writable folder and run the EXE. Keep `.project` and `_myteam_runtime` beside it.
 
 For an update:
 

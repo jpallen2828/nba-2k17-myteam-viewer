@@ -681,8 +681,8 @@ class TeamWorkspace(QWidget):
         self.custom_toggle.blockSignals(True); self.custom_toggle.setChecked(loaded.include_custom); self.custom_toggle.blockSignals(False)
         if self.is_draft:
             from .draft_autosave import DraftAutosave
-            self.autosave = DraftAutosave(self.kind)
-            self.save_automatically()
+            self.autosave = DraftAutosave(self.kind, path=path)
+            self.autosave_note.setText('Loaded lineup · ' + Path(path).name)
             self.odds.blockSignals(True); self.odds.setCurrentIndex(self.odds.findData(loaded.mode)); self.odds.blockSignals(False)
         self.filter_cards(); self.refresh()
 

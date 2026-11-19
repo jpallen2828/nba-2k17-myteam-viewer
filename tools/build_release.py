@@ -26,7 +26,7 @@ def main():
             raise FileNotFoundError(f'Missing hook build resource: game_hook/{name}')
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
             raise ValueError(f'Hook build resource differs from the reviewed package: game_hook/{name}')
-    command = [sys.executable, '-m', 'PyInstaller', '--clean', '--noconfirm', '--onefile', '--windowed',
+    command = [sys.executable, '-m', 'PyInstaller', '--clean', '--noconfirm', '--onedir', '--contents-directory', '_myteam_runtime', '--windowed',
                '--collect-all', 'frida',
                '--name', '2K17 MyTEAM', '--paths', str(tools), '--paths', str(scanner),
                '--icon', str(tools / 'nba2k17_viewer/assets/myteam17.ico'),

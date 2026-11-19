@@ -285,14 +285,16 @@ class LoadSignals(QObject):
 
 
 class LoadArchive(QRunnable):
-    def __init__(self, path):
+    def __init__(self, path, *, refresh=False):
         super().__init__()
         self.path = path
+        self.refresh = refresh
         self.signals = LoadSignals()
 
     def run(self):
         try:
-            self.signals.ready.emit(ArchiveRepository(self.path))
+            from .startup_cache import load_repository
+            self.signals.ready.emit(load_repository(self.path, refresh=self.refresh))
         except Exception as error:
             self.signals.error.emit(str(error))
 
@@ -803,20 +805,40 @@ class ViewerWindow(QMainWindow):
     def closeEvent(self, event):
         manager = getattr(self, 'injection_manager', None)
         connection = getattr(self, 'game_connection', None)
-        if manager is not None and manager.busy and not (connection and connection.active):
+        # A close request is deferred, never discarded. Cancel read-only work;
+        # an active write/recovery retains its owner until it is safe to exit.
+        def defer_close():
+            self._close_after_connection = True
+            if manager is not None:
+                manager.cancel()
+            timer = getattr(self, '_close_retry_timer', None)
+            if timer is None:
+                timer = self._close_retry_timer = QTimer(self)
+                timer.setInterval(250)
+                timer.timeout.connect(self.close)
+            timer.start()
             event.ignore()
+        if (manager is not None and manager.busy
+                and (manager.writing or not (connection and connection.active))):
+            if connection is not None:
+                connection.timer.stop()
+            defer_close()
             return
         if any(getattr(panel, 'busy', False) for panel, _, _ in self.overlay_history):
-            event.ignore()
+            defer_close()
             return
         if self.studio is not None and not self.studio.close():
+            self._close_after_connection = False
+            if getattr(self, '_close_retry_timer', None):
+                self._close_retry_timer.stop()
             event.ignore()
             return
         if connection is not None and not connection.shutdown():
-            self._close_after_connection = True
-            event.ignore()
+            defer_close()
             return
         if manager is not None: manager.shutdown()
+        if getattr(self, '_close_retry_timer', None):
+            self._close_retry_timer.stop()
         event.accept()
 
     def focus_search(self):
@@ -1014,7 +1036,7 @@ class ViewerWindow(QMainWindow):
         self.import_cards.setEnabled(False)
         self.loading.show()
         self.status.setText('Reading saved archive…')
-        self.loader = LoadArchive(self.path)
+        self.loader = LoadArchive(self.path, refresh=self.repository is not None)
         self.loader.signals.ready.connect(self.archive_loaded)
         self.loader.signals.error.connect(self.archive_error)
         QThreadPool.globalInstance().start(self.loader)
@@ -1107,10 +1129,16 @@ def main(argv=None):
     parser.add_argument('--source', '--database', type=Path, default=None)
     parser.add_argument('--smoke-test', action='store_true')
     parser.add_argument('--ui-smoke-test', action='store_true')
+    parser.add_argument('--startup-test', action='store_true', help='Measure readiness without connecting to the game')
+    parser.add_argument('--warm-startup-cache', action='store_true', help='Prepare the disposable startup cache')
     parser.add_argument('--report', type=Path)
     parser.add_argument('--migrate-from', type=Path, help='Copy personal data from an older portable app folder')
     args = parser.parse_args(argv)
     path = args.source or default_source()
+    if args.warm_startup_cache:
+        from .startup_cache import load_repository
+        load_repository(path)
+        return 0
     if args.migrate_from:
         from .release_update import migrate
         result = migrate(args.migrate_from, project_root())
@@ -1156,9 +1184,23 @@ def main(argv=None):
     app.setWindowIcon(app_icon())
     app.setStyle('Fusion')
     app.setStyleSheet(STYLE)
-    if args.ui_smoke_test:
+    if args.ui_smoke_test or args.startup_test:
         os.environ['NBA2K17_DISABLE_GAME_MONITOR'] = '1'
     window = ViewerWindow(path)
+    if args.startup_test:
+        def startup_ready():
+            app.processEvents()
+            assert window.model.rowCount() > 0
+            assert all(button.isEnabled() for button in window.team_buttons.values())
+            window.search.setText('Luka')
+            window.apply_filters()
+            assert window.model.rowCount() > 0
+            if args.report:
+                args.report.write_text(json.dumps({'ready': True, 'cards': len(window.repository.rows),
+                    'search_works': True, 'team_modes_enabled': True}), encoding='utf-8')
+            window.close()
+        window.loaded.connect(startup_ready)
+        QTimer.singleShot(90000, lambda: app.exit(2))
     if args.ui_smoke_test:
         def verify_ui():
             try:
